@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nạp tiền · KY MMO</title>
+  {% include '_public_style.html' %}
+  <style>
+    .deposit-page{min-height:calc(100vh - 80px);padding:42px 20px 80px;background:radial-gradient(circle at 10% 0%,rgba(22,87,255,.13),transparent 34%),#070d19}
+    .deposit-shell{width:min(1120px,100%);margin:auto}
+    .deposit-title{margin-bottom:22px}.deposit-title h1{margin:0 0 7px;color:#f5f7ff;font-size:36px}.deposit-title p{margin:0;color:#8da0c3}
+    .deposit-grid{display:grid;grid-template-columns:390px 1fr;gap:22px;align-items:start}
+    .card{border:1px solid #21314f;border-radius:18px;background:#0a1324;box-shadow:0 20px 55px rgba(0,0,0,.24)}
+    .create-card{padding:24px;position:sticky;top:100px}.create-card h2,.history-card h2{margin:0;color:#f5f7ff;font-size:20px}
+    .field{margin-top:18px}.field label{display:block;margin-bottom:8px;color:#aab8d1;font-size:12px;font-weight:700}
+    .field input{width:100%;box-sizing:border-box;min-height:46px;padding:0 13px;border:1px solid #2a3b5b;border-radius:11px;background:#07111f;color:#f5f7ff;font:inherit;outline:none}
+    .field input:focus{border-color:#4389ff;box-shadow:0 0 0 3px rgba(67,137,255,.12)}
+    .submit-btn{width:100%;min-height:47px;margin-top:18px;border:0;border-radius:11px;background:linear-gradient(135deg,#1769ff,#2e82ff);color:#fff;font:inherit;font-weight:800;cursor:pointer}
+    .bank-box{margin-top:20px;padding:16px;border:1px solid #263956;border-radius:13px;background:#071120}
+    .bank-row{display:flex;justify-content:space-between;gap:12px;margin:8px 0;color:#8496b7;font-size:12px}.bank-row strong{color:#eff4ff;text-align:right}
+    .history-card{padding:24px}.deposit-item{margin-top:12px;padding:16px;border:1px solid #1d2c47;border-radius:13px;background:#081220}
+    .deposit-top{display:flex;justify-content:space-between;gap:14px;align-items:center}.deposit-code{color:#f4f7ff;font-weight:800}.deposit-amount{color:#2bd7ac;font-weight:900}
+    .deposit-meta{margin-top:7px;color:#7486a8;font-size:11px;line-height:1.6}
+    .status{display:inline-flex;margin-top:11px;min-height:28px;padding:0 10px;align-items:center;border-radius:999px;font-size:10px;font-weight:900;text-transform:uppercase}
+    .processing{color:#f6c85e;background:rgba(246,200,94,.1);border:1px solid rgba(246,200,94,.28)}
+    .completed{color:#2bd7ac;background:rgba(43,215,172,.1);border:1px solid rgba(43,215,172,.28)}
+    .failed{color:#ff7188;background:rgba(255,113,136,.09);border:1px solid rgba(255,113,136,.25)}
+    .qr-box{margin-top:14px;padding:12px;border:1px solid #263956;border-radius:12px;background:#fff;text-align:center}.qr-box img{width:min(230px,100%);display:block;margin:auto}.qr-note{margin-top:8px;color:#7486a8;font-size:11px}
+    .reason{margin-top:10px;padding:10px;border-radius:9px;background:rgba(255,113,136,.07);color:#ff9bad;font-size:12px}
+    .empty{margin-top:16px;padding:42px 16px;text-align:center;border:1px dashed #2b3d5e;border-radius:13px;color:#8294b5}
+    .flash{margin-bottom:16px;padding:13px 15px;border-radius:11px;background:#101f36;color:#dce8fb}
+    @media(max-width:850px){.deposit-grid{grid-template-columns:1fr}.create-card{position:static}}
+  </style>
+{% include '_professional_ui.html' %}</head>
+<body>
+  {% include '_public_nav.html' %}
+  <main class="deposit-page">
+    <div class="deposit-shell">
+      <div class="deposit-title">
+        <h1>Nạp tiền</h1>
+        <p>Tạo yêu cầu, chuyển khoản đúng nội dung rồi chờ admin xác nhận.</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="deposit-grid">
+        <section class="card create-card">
+          <h2>Tạo yêu cầu nạp</h2>
+
+          <form method="post" action="{{ url_for('deposit.create_deposit') }}">
+            <div class="field">
+              <label>SỐ TIỀN MUỐN NẠP</label>
+              <input name="amount" inputmode="numeric" placeholder="Ví dụ: 100000" required>
+            </div>
+            <button class="submit-btn" type="submit">Tạo yêu cầu</button>
+          </form>
+
+          <div class="bank-box">
+            <div class="bank-row"><span>Ngân hàng</span><strong>{{ bank_name }}</strong></div>
+            <div class="bank-row"><span>Số tài khoản</span><strong>{{ bank_account_number or 'Chưa cấu hình' }}</strong></div>
+            <div class="bank-row"><span>Chủ tài khoản</span><strong>{{ bank_account_name or 'Chưa cấu hình' }}</strong></div>
+            <div class="bank-row"><span>Tối thiểu</span><strong>{{ "{:,.0f}".format(min_deposit).replace(",", ".") }}₫</strong></div>
+          </div>
+        </section>
+
+        <section class="card history-card">
+          <h2>Lịch sử yêu cầu nạp</h2>
+
+          {% for deposit in deposits %}
+            <article class="deposit-item">
+              <div class="deposit-top">
+                <div class="deposit-code">{{ deposit.code }}</div>
+                <div class="deposit-amount">{{ "{:,.0f}".format(deposit.amount).replace(",", ".") }}₫</div>
+              </div>
+
+              <div class="deposit-meta">
+                Nội dung CK: <strong>{{ deposit.transfer_content }}</strong><br>
+                Ngân hàng: {{ deposit.bank_name }} · {{ deposit.account_number }}<br>
+                Tạo lúc:
+                {% if deposit.created_at %}
+                  {{ vietnam_time(deposit.created_at).strftime('%d/%m/%Y %H:%M') }}
+                {% endif %}
+              </div>
+
+              <span class="status {{ deposit.status }}">
+                {% if deposit.status == 'processing' %}Đang xử lý
+                {% elif deposit.status == 'completed' %}Hoàn thành
+                {% elif deposit.status == 'failed' %}Thất bại
+                {% else %}{{ deposit.status }}{% endif %}
+              </span>
+
+              {% if deposit.status == 'processing' and qr_url(deposit) %}
+                <div class="qr-box">
+                  <img src="{{ qr_url(deposit) }}" alt="QR chuyển khoản {{ deposit.code }}">
+                </div>
+                <div class="qr-note">Quét QR và giữ nguyên nội dung chuyển khoản <strong>{{ deposit.transfer_content }}</strong>.</div>
+              {% endif %}
+
+              {% if deposit.failure_reason %}
+                <div class="reason">Lý do: {{ deposit.failure_reason }}</div>
+              {% endif %}
+            </article>
+          {% else %}
+            <div class="empty">Bạn chưa tạo yêu cầu nạp tiền nào.</div>
+          {% endfor %}
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

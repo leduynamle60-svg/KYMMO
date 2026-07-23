@@ -1,0 +1,9 @@
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand"><a class="brand" href="{{ url_for('home') }}">KY<b>MMO</b></a><p>Marketplace dành cho tài khoản, gift card và dịch vụ số. Giao dịch minh bạch, seller được xét duyệt và hỗ trợ rõ ràng.</p></div>
+    <div><h3>Hỗ trợ</h3><a href="{{ url_for('support_page') }}">Trung tâm hỗ trợ</a><a href="{{ url_for('orders') if current_user else url_for('auth', mode='login') }}">Đơn hàng của tôi</a>{% if not current_user %}<a href="{{ url_for('auth', mode='login') }}">Trở thành người bán</a>{% elif normalized_role(current_user) == 'buyer' %}<a href="{{ url_for('become_seller') }}">{% if seller_request_status == 'pending' %}Đang chờ xét duyệt{% else %}Trở thành người bán{% endif %}</a>{% endif %}</div>
+    <div><h3>Chính sách</h3><a href="{{ url_for('terms_page') }}">Điều khoản sử dụng</a><a href="{{ url_for('warranty_page') }}">Chính sách bảo hành</a><a href="{{ url_for('refund_page') }}">Chính sách hoàn tiền</a><a href="{{ url_for('privacy_page') }}">Quyền riêng tư</a></div>
+    <div><h3>Cộng đồng</h3><a href="#" aria-label="Discord KY MMO">Discord Community</a><a href="mailto:support@kymmo.vn">Email hỗ trợ</a><span class="footer-note">Link Discord có thể cập nhật sau.</span></div>
+  </div>
+  <div class="container footer-bottom"><span>© 2026 KY MMO. All rights reserved.</span><span>Uy tín · Minh bạch · Hỗ trợ nhanh</span></div>
+</footer>

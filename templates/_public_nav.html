@@ -1,0 +1,355 @@
+<style>
+  .nav .container{
+    display:flex;
+    align-items:center;
+    gap:28px;
+  }
+
+  .nav .links{
+    display:flex;
+    align-items:center;
+    gap:24px;
+  }
+
+  .nav .actions{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+
+  .nav-user{
+    position:relative;
+  }
+
+  .nav-user-trigger{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-height:44px;
+    padding:6px 10px 6px 7px;
+    border:1px solid #263754;
+    border-radius:12px;
+    background:#0c1628;
+    color:#f5f7ff;
+    font:inherit;
+    cursor:pointer;
+    transition:.2s ease;
+  }
+
+  .nav-user-trigger:hover,
+  .nav-user.open .nav-user-trigger{
+    border-color:#4c8dff;
+    background:#101d34;
+    box-shadow:0 8px 24px rgba(22,87,255,.15);
+  }
+
+  .nav-avatar{
+    width:31px;
+    height:31px;
+    display:grid;
+    place-items:center;
+    border-radius:9px;
+    background:linear-gradient(135deg,#1769ff,#67a7ff);
+    color:#fff;
+    font-weight:800;
+    font-size:13px;
+  }
+
+  .nav-user-name{
+    max-width:145px;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .nav-chevron{
+    color:#8192b2;
+    font-size:11px;
+    transition:transform .2s ease;
+  }
+
+  .nav-user.open .nav-chevron{
+    transform:rotate(180deg);
+  }
+
+  .nav-dropdown{
+    position:absolute;
+    z-index:1000;
+    top:calc(100% + 10px);
+    right:0;
+    width:230px;
+    padding:8px;
+    border:1px solid #263754;
+    border-radius:14px;
+    background:#091323;
+    box-shadow:0 22px 60px rgba(0,0,0,.45);
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(-6px);
+    transition:.18s ease;
+  }
+
+  .nav-user.open .nav-dropdown{
+    opacity:1;
+    visibility:visible;
+    transform:translateY(0);
+  }
+
+  .nav-dropdown-head{
+    padding:10px 11px 12px;
+    border-bottom:1px solid #1d2b45;
+    margin-bottom:6px;
+  }
+
+  .nav-dropdown-head strong{
+    display:block;
+    color:#f5f7ff;
+    font-size:13px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .nav-dropdown-head span{
+    display:block;
+    margin-top:3px;
+    color:#7f90af;
+    font-size:11px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .nav-dropdown a{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    min-height:40px;
+    padding:0 11px;
+    border-radius:9px;
+    color:#cbd6ec;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:600;
+    transition:.16s ease;
+  }
+
+  .nav-dropdown a:hover{
+    background:#101e35;
+    color:#fff;
+  }
+
+  .nav-dropdown .danger{
+    margin-top:5px;
+    border-top:1px solid #1d2b45;
+    border-radius:0 0 9px 9px;
+    color:#ff758c;
+  }
+
+
+  .nav-cart-link{
+    position:relative;
+    width:44px;
+    height:42px;
+    display:grid;
+    place-items:center;
+    border:1px solid #263754;
+    border-radius:11px;
+    background:#0e182a;
+    color:#eef4ff;
+    text-decoration:none;
+    transition:.18s ease;
+  }
+  .nav-cart-link:hover{border-color:#4c8dff;background:#101d34}
+  .nav-cart-link svg{width:20px;height:20px;display:block}
+  .nav-cart-count{
+    position:absolute;
+    top:-7px;
+    right:-7px;
+    min-width:20px;
+    height:20px;
+    padding:0 5px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:2px solid #070d19;
+    border-radius:999px;
+    background:#246bff;
+    color:#fff;
+    font-size:10px;
+    font-weight:900;
+    line-height:1;
+  }
+
+  .nav-wallet-pill{
+    display:inline-flex;
+    align-items:center;
+    min-height:42px;
+    padding:0 14px;
+    border:1px solid rgba(34,211,164,.3);
+    border-radius:11px;
+    background:rgba(34,211,164,.08);
+    color:#29d8ab;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:800;
+  }
+
+  .nav-login-btn,
+  .nav-register-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:42px;
+    padding:0 17px;
+    border-radius:11px;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:700;
+    transition:.2s ease;
+  }
+
+  .nav-login-btn{
+    border:1px solid #263754;
+    background:#0e182a;
+    color:#f3f6fc;
+  }
+
+  .nav-register-btn{
+    border:1px solid transparent;
+    background:linear-gradient(135deg,#1657ff,#2878ff);
+    color:#fff;
+    box-shadow:0 7px 22px rgba(22,87,255,.28);
+  }
+
+  @media(max-width:760px){
+    .nav .links,
+    .nav-wallet-pill,
+    .nav-user-name,
+    .nav .seller{
+      display:none;
+    }
+
+    .nav .container{
+      gap:12px;
+    }
+  }
+</style>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="{{ url_for('home') }}">KY<b>MMO</b></a>
+
+    <nav class="links">
+      <a href="{{ url_for('marketplace') }}">Khám phá</a>
+      <a href="{{ url_for('support_page') }}">Hỗ trợ</a>
+    </nav>
+
+    <div class="actions">
+      {% if current_user %}
+        {% set top_role = (current_user.role or 'buyer') | lower %}
+        {% if top_role in ['founder', 'owner', 'admin'] %}
+          <a class="btn seller" href="{{ url_for('admin') }}">Dashboard quản trị</a>
+        {% elif top_role == 'seller' %}
+          <a class="btn seller" href="{{ url_for('seller_dashboard') }}">Seller Dashboard</a>
+        {% elif seller_request_status == 'pending' %}
+          <a class="btn seller" href="{{ url_for('become_seller') }}">🟡 Đang chờ duyệt</a>
+        {% else %}
+          <a class="btn seller" href="{{ url_for('become_seller') }}">Trở thành người bán</a>
+        {% endif %}
+      {% else %}
+        <a class="btn seller" href="{{ url_for('auth', mode='login') }}">Trở thành người bán</a>
+      {% endif %}
+
+      {% if current_user %}
+        <a class="nav-cart-link" href="{{ url_for('cart') }}" aria-label="Giỏ hàng" title="Giỏ hàng">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="9" cy="20" r="1"></circle><circle cx="19" cy="20" r="1"></circle>
+            <path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.8a2 2 0 0 0 2-1.6L21 7H6"></path>
+          </svg>
+          {% if cart_count %}<span class="nav-cart-count">{{ 99 if cart_count > 99 else cart_count }}</span>{% endif %}
+        </a>
+
+        <a class="nav-wallet-pill" href="{{ url_for('wallet') }}">
+          {{ "{:,.0f}".format(current_user.balance or 0).replace(",", ".") }}₫
+        </a>
+
+        <div class="nav-user" id="nav-user">
+          <button
+            type="button"
+            class="nav-user-trigger"
+            id="nav-user-trigger"
+            aria-expanded="false"
+            aria-haspopup="true"
+          >
+            <span class="nav-avatar">
+              {{ current_user.username[:1] | upper }}
+            </span>
+            <span class="nav-user-name">{{ current_user.username }}</span>
+            <span class="nav-chevron">▼</span>
+          </button>
+
+          <div class="nav-dropdown" id="nav-dropdown">
+            <div class="nav-dropdown-head">
+              <strong>{{ current_user.username }}</strong>
+              <span>{{ current_user.email }}</span>
+            </div>
+
+            <a href="{{ url_for('profile') }}">
+              <span>Hồ sơ cá nhân</span><span>›</span>
+            </a>
+
+            <a href="{{ url_for('wallet') }}">
+              <span>Ví của tôi</span><span>›</span>
+            </a>
+
+            <a href="{{ url_for('orders') }}"><span>Đơn hàng</span><span>›</span></a>
+            {% set nav_role = (current_user.role or 'buyer')|lower %}
+            {% if nav_role in ['seller','admin','founder','owner'] %}<a href="{{ url_for('seller_dashboard') }}"><span>Seller Dashboard</span><span>›</span></a>{% endif %}
+            {% if nav_role in ['admin','founder','owner'] %}<a href="{{ url_for('admin') }}"><span>Dashboard quản trị</span><span>›</span></a>{% endif %}
+
+            <a class="danger" href="{{ url_for('logout_get') }}">
+              <span>Đăng xuất</span><span>↗</span>
+            </a>
+          </div>
+        </div>
+      {% else %}
+        <a class="nav-login-btn" href="{{ url_for('auth', mode='login') }}">
+          Đăng nhập
+        </a>
+        <a class="nav-register-btn" href="{{ url_for('auth', mode='register') }}">
+          Đăng ký
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<script>
+  (() => {
+    const user = document.getElementById("nav-user");
+    const trigger = document.getElementById("nav-user-trigger");
+
+    if (!user || !trigger) return;
+
+    const closeMenu = () => {
+      user.classList.remove("open");
+      trigger.setAttribute("aria-expanded", "false");
+    };
+
+    trigger.addEventListener("click", event => {
+      event.stopPropagation();
+      const isOpen = user.classList.toggle("open");
+      trigger.setAttribute("aria-expanded", String(isOpen));
+    });
+
+    document.addEventListener("click", closeMenu);
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeMenu();
+    });
+  })();
+</script>

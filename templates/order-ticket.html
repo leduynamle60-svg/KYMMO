@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ticket {{ order.reference }} · KY MMO</title>
+  {% include '_public_style.html' %}
+  <style>
+    .page{padding:42px 20px 80px;background:#070d19;min-height:100vh}
+    .shell{width:min(900px,100%);margin:auto}
+    .card{padding:20px;border:1px solid #223455;border-radius:16px;background:#0a1425;color:#eef4ff;margin-bottom:16px}
+    .messages{max-height:520px;overflow-y:auto;padding-right:5px;scroll-behavior:smooth}
+    .msg{max-width:78%;padding:12px 14px;border-radius:14px;background:#08111f;border:1px solid #1d3152;margin:10px 0}
+    .msg.mine{margin-left:auto;background:#102d62;border-color:#255fc2}
+    .msg-content{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
+    .meta{color:#8294b5;font-size:12px;margin-top:5px}
+    .field textarea{width:100%;box-sizing:border-box;min-height:90px;padding:12px;border:1px solid #2a3d60;border-radius:10px;background:#08111f;color:#fff;resize:vertical}
+    .hint{margin:8px 0 0;color:#8294b5;font-size:12px}
+    .btn{padding:11px 15px;border:0;border-radius:10px;background:#246bff;color:#fff;font-weight:800;margin-top:10px;cursor:pointer}
+    .secret{white-space:pre-wrap;padding:16px;border:1px dashed #2bd7ac;border-radius:12px;background:#071b1a;color:#b9fff0}
+  </style>
+  {% include '_professional_ui.html' %}
+</head>
+<body>
+  {% include '_public_nav.html' %}
+  <main class="page">
+    <div class="shell">
+      <div class="card">
+        <h1>Đơn {{ order.reference }}</h1>
+        <p>{{ product.name if product else 'Sản phẩm' }} · {{ '{:,.0f}'.format(order.amount).replace(',','.') }}₫</p>
+        <p class="meta">Cách giao: {{ 'Tự động' if order.delivery_type=='automatic' else 'Thủ công bằng ticket' }} · Trạng thái: {{ order.status }}</p>
+        {% if order.delivered_content %}
+          <h3>Thông tin giao hàng tự động</h3>
+          <div class="secret">{{ order.delivered_content }}</div>
+        {% endif %}
+      </div>
+
+      {% if order.delivery_type=='manual' %}
+        <div class="card">
+          <h2>Ticket Buyer ↔ Seller</h2>
+          <div class="messages" id="ticketMessages">
+            {% for m in messages %}
+              <div class="msg {% if m.sender_id == current_user.id %}mine{% endif %}">
+                <b>{{ users.get(m.sender_id).username if users.get(m.sender_id) else 'Người dùng' }}</b>
+                <div class="msg-content">{{ m.content }}</div>
+                <div class="meta">{{ m.created_at | vn_time }}</div>
+              </div>
+            {% endfor %}
+          </div>
+          <form method="post" id="ticketMessageForm">
+            <div class="field">
+              <textarea id="ticketMessage" name="content" placeholder="Nhập tin nhắn..." required></textarea>
+            </div>
+            <p class="hint">Enter để gửi · Shift + Enter để xuống dòng</p>
+            <button class="btn" type="submit">Gửi tin nhắn</button>
+          </form>
+        </div>
+      {% endif %}
+
+      {% if current_user.id==order.seller_id and order.delivery_type=='manual' and order.status in ['paid','processing'] %}
+        <form class="card" method="post" action="{{ url_for('mark_order_delivered',order_id=order.id) }}">
+          <h2>Xác nhận đã giao</h2>
+          <div class="field"><textarea name="delivery_note" placeholder="Thông tin giao hàng hoặc hướng dẫn cho Buyer"></textarea></div>
+          <button class="btn">Đánh dấu đã giao</button>
+        </form>
+      {% endif %}
+
+      {% if current_user.id==order.buyer_id and order.status=='delivered' %}
+        <form class="card" method="post" action="{{ url_for('confirm_order',order_id=order.id) }}">
+          <p>Tiền của Seller đã được ghi nhận và đang trong thời gian giữ 7 ngày từ lúc thanh toán. Xác nhận nhận hàng không ảnh hưởng đến khoản tiền đang giữ; đánh giá là tùy chọn.</p>
+          <button class="btn">Xác nhận đã nhận hàng</button>
+        </form>
+      {% endif %}
+
+      {% if current_user.id==order.buyer_id and order.status=='completed' %}
+        <div class="card">
+          <h2>Đánh giá gian hàng</h2>
+          <p>Đơn đã hoàn tất. Bạn có thể để lại đánh giá từ 1 đến 5 sao cho Seller.</p>
+          <a class="btn" href="{{ url_for('review_order',order_id=order.id) }}" style="display:inline-flex;text-decoration:none;align-items:center">Đánh giá ngay</a>
+        </div>
+      {% endif %}
+    </div>
+  </main>
+  <script>
+    (() => {
+      const form = document.getElementById('ticketMessageForm');
+      const textarea = document.getElementById('ticketMessage');
+      const messages = document.getElementById('ticketMessages');
+      if (messages) messages.scrollTop = messages.scrollHeight;
+      if (!form || !textarea) return;
+      textarea.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          if (textarea.value.trim()) {
+            if (form.requestSubmit) form.requestSubmit();
+            else form.submit();
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

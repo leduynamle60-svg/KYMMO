@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Trở thành người bán · KY MMO</title>{% include '_public_style.html' %}
+<style>
+.status-card{max-width:760px;margin:60px auto;padding:34px;border:1px solid #284064;border-radius:18px;background:#0a1426;text-align:center}.status-icon{font-size:48px}.status-card h1{color:#fff}.status-card p{color:#92a4c5;line-height:1.7}.status-meta{margin:22px 0;padding:17px;border-radius:12px;background:#07101e;border:1px solid #1c2d49;text-align:left;color:#9db0cf}.status-meta strong{color:#fff}.status-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}.warning-box{padding:14px;border:1px solid #705628;background:#261e0b;color:#f7ce75;border-radius:11px;margin:15px 0}.rejected-box{padding:14px;border:1px solid #6b2940;background:#24101a;color:#ff9fb3;border-radius:11px;margin:15px 0}
+</style>{% include '_professional_ui.html' %}</head><body>
+{% include '_public_nav.html' %}
+<main class="container">
+{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="flash {{ category }}" style="margin-top:24px">{{ message }}</div>{% endfor %}{% endwith %}
+
+{% if existing_request %}
+<section class="status-card">
+  <div class="status-icon">⏳</div>
+  <h1>Yêu cầu đang chờ xét duyệt</h1>
+  <p>Yêu cầu trở thành Seller của bạn đã được lưu thành công. Founder/Admin sẽ kiểm tra thông tin và phản hồi qua Gmail.</p>
+  <div class="status-meta">
+    <div><strong>Mã yêu cầu:</strong> #{{ existing_request.id }}</div>
+    <div><strong>Tên gian hàng:</strong> {{ existing_request.shop_name }}</div>
+    <div><strong>Danh mục:</strong> {{ existing_request.category }}</div>
+    <div><strong>Trạng thái:</strong> Đang chờ duyệt</div>
+    <div><strong>Ngày gửi:</strong> {{ existing_request.created_at.strftime('%d/%m/%Y %H:%M') if existing_request.created_at else 'Chưa có dữ liệu' }}</div>
+  </div>
+  <div class="warning-box">Bạn không cần gửi lại yêu cầu. Hệ thống đã khóa form để tránh gửi trùng.</div>
+  <div class="status-actions"><a class="btn primary" href="{{ url_for('home') }}">Về trang chủ</a><a class="btn" href="{{ url_for('profile') }}">Xem hồ sơ</a></div>
+</section>
+{% else %}
+<form class="form-card" method="post">
+  <h1>Đăng ký trở thành người bán</h1><p>Điền thông tin cơ bản để gửi yêu cầu mở gian hàng.</p>
+  {% if latest_request and latest_request.status == 'rejected' %}<div class="rejected-box"><strong>Yêu cầu trước đã bị từ chối.</strong><br>{{ latest_request.admin_note or 'Bạn có thể bổ sung thông tin và gửi lại yêu cầu mới.' }}</div>{% endif %}
+  <div class="form-grid">
+    <div class="field"><label>Tên gian hàng *</label><input name="shop_name" maxlength="80" required></div>
+    <div class="field"><label>Họ và tên người đại diện *</label><input name="full_name" maxlength="80" required></div>
+    <div class="field"><label>Email nhận thông báo *</label><input type="email" name="email" value="{{ current_user.email }}" required></div>
+    <div class="field"><label>Số điện thoại *</label><input name="phone" maxlength="20" required></div>
+    <div class="field full"><label>Loại sản phẩm dự định bán *</label><select name="category" required><option value="">Chọn danh mục</option><option>Tài khoản game</option><option>Phần mềm và bản quyền</option><option>Dịch vụ số</option><option>Thẻ quà tặng</option><option>Khác</option></select></div>
+    <div class="field full"><label>Mô tả gian hàng và nguồn sản phẩm *</label><textarea name="description" maxlength="1000" required placeholder="Mô tả sản phẩm, kinh nghiệm, cách giao hàng, bảo hành..."></textarea></div>
+    <div class="field full"><label><input type="checkbox" required style="width:auto"> Tôi đồng ý tuân thủ quy định người bán và không đăng sản phẩm vi phạm pháp luật.</label></div>
+  </div>
+  <button class="btn primary" type="submit">Gửi đơn đăng ký</button>
+  <div class="note">Sau khi gửi, yêu cầu sẽ được lưu vào PostgreSQL và thông báo đến Discord webhook của Founder/Admin.</div>
+</form>
+{% endif %}
+</main></body></html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Đánh giá đơn {{ order.reference }} · KY MMO</title>
+  {% include '_public_style.html' %}
+  <style>
+    .review-page{min-height:calc(100vh - 80px);padding:48px 20px 80px;background:#070d19}
+    .review-shell{width:min(760px,100%);margin:auto}
+    .review-card{padding:28px;border:1px solid #223455;border-radius:20px;background:#0a1425;box-shadow:0 22px 60px rgba(0,0,0,.25)}
+    .review-card h1{margin:0 0 8px;color:#f6f8ff;font-size:30px}
+    .sub{margin:0 0 22px;color:#8fa3c5;line-height:1.6}
+    .order-box{padding:16px;border:1px solid #1f3457;border-radius:14px;background:#08111f;margin-bottom:22px}
+    .order-box strong{color:#fff}.order-box div{margin-top:6px;color:#8fa3c5}
+    .stars{display:flex;flex-direction:row-reverse;justify-content:flex-end;gap:8px;margin:10px 0 20px}
+    .stars input{display:none}
+    .stars label{font-size:42px;line-height:1;color:#34445f;cursor:pointer;transition:.18s ease;user-select:none}
+    .stars label:hover,.stars label:hover~label,.stars input:checked~label{color:#ffd35c;transform:translateY(-2px)}
+    .field label{display:block;margin-bottom:8px;color:#9db0cf;font-weight:700}
+    .field textarea{width:100%;box-sizing:border-box;min-height:135px;padding:14px;border:1px solid #2b4066;border-radius:13px;background:#07111f;color:#fff;resize:vertical;outline:none}
+    .field textarea:focus{border-color:#2c73ff;box-shadow:0 0 0 3px rgba(44,115,255,.14)}
+    .actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:11px;text-decoration:none;font-weight:800;border:0;cursor:pointer}
+    .btn-secondary{border:1px solid #2a3e61;background:#0c1729;color:#dce7f8}
+    .btn-primary{background:#246bff;color:#fff}
+    .flash{margin-bottom:14px;padding:13px 15px;border:1px solid #2a3c5d;border-radius:11px;background:#101f36;color:#e0e9f8}
+  </style>
+{% include '_professional_ui.html' %}</head>
+<body>
+  {% include '_public_nav.html' %}
+  <main class="review-page">
+    <div class="review-shell">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <section class="review-card">
+        <h1>Đánh giá gian hàng</h1>
+        <p class="sub">Bạn đã xác nhận nhận hàng. Hãy chia sẻ trải nghiệm để những Buyer khác tham khảo.</p>
+
+        <div class="order-box">
+          <strong>{{ shop.name }}</strong>
+          <div>{{ product.name if product else 'Sản phẩm' }} · Đơn {{ order.reference }}</div>
+        </div>
+
+        <form method="post">
+          <div class="field">
+            <label>Mức độ hài lòng</label>
+            <div class="stars" aria-label="Chọn số sao">
+              <input type="radio" id="star5" name="rating" value="5" required><label for="star5" title="5 sao">★</label>
+              <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 sao">★</label>
+              <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 sao">★</label>
+              <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 sao">★</label>
+              <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 sao">★</label>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="content">Nhận xét của bạn</label>
+            <textarea id="content" name="content" minlength="3" maxlength="1000" placeholder="Ví dụ: Seller phản hồi nhanh, giao đúng mô tả..." required></textarea>
+          </div>
+
+          <div class="actions">
+            <a class="btn btn-secondary" href="{{ url_for('order_ticket', order_id=order.id) }}">Đánh giá sau</a>
+            <button class="btn btn-primary" type="submit">Gửi đánh giá</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Duyệt nạp tiền · KY MMO</title>
+  {% include '_public_style.html' %}
+  <style>
+    .page{min-height:100vh;padding:42px 20px 80px;background:#070d19}.shell{width:min(1180px,100%);margin:auto}
+    h1{color:#f5f7ff}.flash{margin:12px 0;padding:13px;border-radius:10px;background:#101f36;color:#e8f0ff}
+    .item{margin-top:12px;padding:18px;border:1px solid #21314f;border-radius:15px;background:#0a1324}
+    .top{display:flex;justify-content:space-between;gap:15px}.code{color:#fff;font-weight:900}.amount{color:#2bd7ac;font-size:19px;font-weight:900}
+    .meta{margin-top:8px;color:#8496b7;font-size:12px;line-height:1.7}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button,input{font:inherit}.approve{min-height:40px;padding:0 15px;border:0;border-radius:9px;background:#1bbf91;color:#fff;font-weight:800;cursor:pointer}
+    .reject-form{display:flex;gap:8px;flex:1}.reject-form input{flex:1;min-width:180px;padding:0 11px;border:1px solid #30415f;border-radius:9px;background:#07111f;color:#fff}
+    .reject{min-height:40px;padding:0 15px;border:0;border-radius:9px;background:#e65069;color:#fff;font-weight:800;cursor:pointer}
+    .done{color:#2bd7ac}.failed{color:#ff7188}
+  </style>
+{% include '_professional_ui.html' %}</head>
+<body>
+  {% include '_public_nav.html' %}
+  <main class="page">
+    <div class="shell">
+      <h1>Duyệt yêu cầu nạp tiền</h1>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      {% for deposit in deposits %}
+        <article class="item">
+          <div class="top">
+            <div class="code">{{ deposit.code }}</div>
+            <div class="amount">{{ "{:,.0f}".format(deposit.amount).replace(",", ".") }}₫</div>
+          </div>
+
+          <div class="meta">
+            Khách: {{ deposit.user.username }} · {{ deposit.user.email }}<br>
+            Nội dung CK: <strong>{{ deposit.transfer_content }}</strong><br>
+            Tài khoản nhận: {{ deposit.bank_name }} · {{ deposit.account_number }} · {{ deposit.account_name }}<br>
+            Trạng thái:
+            {% if deposit.status == 'completed' %}<strong class="done">Hoàn thành</strong>
+            {% elif deposit.status == 'failed' %}<strong class="failed">Thất bại</strong>
+            {% else %}<strong>Đang xử lý</strong>{% endif %}
+            {% if deposit.failure_reason %}<br>Lý do: {{ deposit.failure_reason }}{% endif %}
+          </div>
+
+          {% if deposit.status == 'processing' %}
+            <div class="actions">
+              <form method="post" action="{{ url_for('deposit.approve_deposit', deposit_id=deposit.id) }}">
+                <button class="approve" type="submit">Duyệt & cộng ví</button>
+              </form>
+
+              <form class="reject-form" method="post" action="{{ url_for('deposit.reject_deposit', deposit_id=deposit.id) }}">
+                <input name="reason" placeholder="Nhập lý do thất bại..." required>
+                <button class="reject" type="submit">Từ chối</button>
+              </form>
+            </div>
+          {% endif %}
+        </article>
+      {% else %}
+        <p style="color:#8294b5">Chưa có yêu cầu nạp tiền.</p>
+      {% endfor %}
+    </div>
+  </main>
+</body>
+</html>

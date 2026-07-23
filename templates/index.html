@@ -1,0 +1,17 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KY MMO</title>{% include '_public_style.html' %}{% include '_professional_ui.html' %}</head><body>
+{% include '_public_nav.html' %}
+<div class="trust-marquee" aria-label="Cam kết của KY MMO"><div class="trust-track"><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Thông tin sản phẩm minh bạch</span><span>Hỗ trợ nhanh chóng</span><span>Thanh toán bằng ví an toàn</span><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Thông tin sản phẩm minh bạch</span><span>Hỗ trợ nhanh chóng</span><span>Thanh toán bằng ví an toàn</span></div></div>
+<main><section class="hero home-hero"><div class="container"><span class="eyebrow">KY MMO Marketplace</span><h1>Mua bán sản phẩm số <span>nhanh và an toàn</span></h1><p>Tìm tài khoản, gift card và dịch vụ số từ các seller đã được xét duyệt. Thanh toán qua ví KY MMO, theo dõi đơn hàng rõ ràng và được bảo vệ trong 7 ngày.</p><div class="hero-actions">
+  <a class="btn primary" href="{{ url_for('marketplace') }}">Khám phá sản phẩm</a>
+  {% if not current_user %}
+    <a class="btn seller" href="{{ url_for('auth', mode='login') }}">Trở thành người bán</a>
+  {% elif normalized_role(current_user) == 'buyer' %}
+    {% if seller_request_status == 'pending' %}
+      <a class="btn seller" href="{{ url_for('become_seller') }}">Đang chờ xét duyệt</a>
+    {% else %}
+      <a class="btn seller" href="{{ url_for('become_seller') }}">Trở thành người bán</a>
+    {% endif %}
+  {% endif %}
+</div><div class="trust-points"><span>Seller được kiểm định</span><span>Giao hàng linh hoạt</span><span>Hỗ trợ minh bạch</span></div></div></section>
+<section class="section"><div class="container"><div class="section-head"><div><span class="eyebrow">Mới cập nhật</span><h2>Sản phẩm nổi bật</h2></div><a class="text-link" href="{{ url_for('marketplace') }}">Xem tất cả →</a></div><div class="featured-grid">{% for p in products %}{% set d=delivery_map.get(p.id) %}<article class="featured-card"><div class="product-top"><span class="category-chip">{{ p.category or 'Dịch vụ' }}</span><span class="delivery-chip">{{ 'Giao tự động' if d and d.delivery_type=='automatic' else 'Ticket thủ công' }}</span></div><h3>{{ p.name }}</h3><p>{{ p.description }}</p><div class="featured-bottom"><strong>{{ '{:,.0f}'.format(p.price).replace(',','.') }}₫</strong><a href="{{ url_for('product_detail', product_id=p.id) }}">Xem sản phẩm</a></div></article>{% else %}<div class="empty featured-empty"><div class="icon">📦</div><h3>Chưa có sản phẩm</h3><p>Sản phẩm mới sẽ xuất hiện tại đây khi seller bắt đầu mở bán.</p></div>{% endfor %}</div></div></section></main>
+{% include '_site_footer.html' %}</body></html>

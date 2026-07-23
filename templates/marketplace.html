@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Marketplace · KY MMO</title>
+  {% include '_public_style.html' %}
+  {% include '_professional_ui.html' %}
+</head>
+<body>
+{% include '_public_nav.html' %}
+<div class="trust-marquee"><div class="trust-track"><span>Uy tín và minh bạch</span><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Hỗ trợ nhanh chóng</span><span>Sản phẩm số đa dạng</span><span>Uy tín và minh bạch</span><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Hỗ trợ nhanh chóng</span><span>Sản phẩm số đa dạng</span></div></div>
+<div class="toast-stack" id="toastStack">{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="toast {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}</div>
+
+<main class="page marketplace-page"><div class="shell">
+  <section class="market-hero">
+    <div class="market-hero-copy">
+      <span class="eyebrow">KY MMO Marketplace</span>
+      <h1>Sản phẩm số, giao nhanh và an toàn.</h1>
+      <p>Tìm gift card, game currency, tài khoản và dịch vụ số từ các gian hàng đã được xét duyệt.</p>
+      <div class="hero-search"><span>⌕</span><input id="heroSearch" type="search" placeholder="Tìm Discord Nitro, Robux, Spotify, Canva..."><button type="button" id="heroSearchButton">Tìm ngay</button></div>
+      <div class="hero-proof"><span>✓ Seller xét duyệt</span><span>⚡ Giao tự động</span><span>🛡 Thanh toán bằng ví</span></div>
+    </div>
+    <div class="market-hero-art">
+      <div class="hero-orb orb-one"></div><div class="hero-orb orb-two"></div>
+      <div class="hero-product-card hero-product-main"><small>Được quan tâm</small><strong>Discord Nitro</strong><span>Giao tự động 24/7</span></div>
+      <div class="hero-product-card hero-product-small"><b>R$</b><span>Robux</span></div>
+      <div class="hero-product-card hero-product-small second"><b>🎁</b><span>Gift Card</span></div>
+    </div>
+  </section>
+
+  <nav class="category-strip" aria-label="Danh mục nổi bật">
+    <button type="button" class="category-tile active" data-kind="all"><span class="category-icon">✦</span><b>Tất cả</b><small>Khám phá</small></button>
+    <button type="button" class="category-tile" data-category="Gift Card"><span class="category-icon">🎁</span><b>Gift Card</b><small>Mã quà tặng</small></button>
+    <button type="button" class="category-tile" data-keyword="robux"><span class="category-icon">R$</span><b>Robux</b><small>Roblox</small></button>
+    <button type="button" class="category-tile" data-keyword="nitro discord"><span class="category-icon">◉</span><b>Discord</b><small>Nitro & Decor</small></button>
+    <button type="button" class="category-tile" data-keyword="spotify"><span class="category-icon">♫</span><b>Spotify</b><small>Premium</small></button>
+    <button type="button" class="category-tile" data-keyword="canva"><span class="category-icon">C</span><b>Canva</b><small>Pro & EDU</small></button>
+    <button type="button" class="category-tile" data-keyword="netflix"><span class="category-icon">N</span><b>Netflix</b><small>Streaming</small></button>
+    <button type="button" class="category-tile" data-category="Game"><span class="category-icon">⌁</span><b>Game</b><small>Key & vật phẩm</small></button>
+    <button type="button" class="category-tile" data-category="AI"><span class="category-icon">AI</span><b>Công cụ AI</b><small>Gói nâng cấp</small></button>
+  </nav>
+
+  {% if products %}
+  <section class="featured-market-section">
+    <div class="section-title-row"><div><span class="eyebrow">Đề xuất hôm nay</span><h2>Sản phẩm mới cập nhật</h2></div><button class="text-button" type="button" data-scroll-catalog>Xem tất cả →</button></div>
+    <div class="featured-product-row">
+      {% for p in products[:4] %}{% set d=delivery_map.get(p.id) %}{% set delivery_type=d.delivery_type if d else 'manual' %}
+      <a class="mini-product" href="{{ url_for('product_detail',product_id=p.id) }}">
+        <div class="mini-product-image">{% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="mini-placeholder" style="display:none">{{ (p.category or 'KY')[:2]|upper }}</div>{% else %}<div class="mini-placeholder">{{ (p.category or 'KY')[:2]|upper }}</div>{% endif %}<span>{{ 'Giao ngay' if delivery_type=='automatic' else 'Qua ticket' }}</span></div>
+        <div class="mini-product-copy"><small>{{ p.category or 'Dịch vụ' }}</small><strong>{{ p.name }}</strong><b>{{ '{:,.0f}'.format(p.price).replace(',','.') }}₫</b></div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section id="catalogSection" class="catalog-section">
+    <div class="section-title-row catalog-heading"><div><span class="eyebrow">Toàn bộ marketplace</span><h2>Khám phá sản phẩm</h2></div><p>Sản phẩm từ các seller đang hoạt động trên KY MMO.</p></div>
+    <section class="catalog-toolbar">
+      <div class="search-box"><span>⌕</span><input id="productSearch" type="search" placeholder="Tìm theo tên hoặc mô tả sản phẩm..."></div>
+      <select id="categoryFilter"><option value="all">Tất cả danh mục</option><option>Gift Card</option><option>Tài khoản</option><option>Dịch vụ</option><option>Game</option><option>Discord</option><option>Streaming</option><option>Phần mềm</option><option>AI</option><option>Khác</option></select>
+      <select id="deliveryFilter"><option value="all">Mọi cách giao</option><option value="automatic">Giao tự động</option><option value="manual">Ticket thủ công</option></select>
+      <select id="sortFilter"><option value="newest">Mới nhất</option><option value="price-asc">Giá thấp đến cao</option><option value="price-desc">Giá cao đến thấp</option><option value="name">Tên A–Z</option></select>
+    </section>
+    <div class="catalog-meta"><strong id="resultCount">{{ products|length }} sản phẩm</strong><button type="button" id="clearFilters">Xóa bộ lọc</button></div>
+
+    <div class="catalog-grid" id="productGrid">
+    {% for p in products %}{% set d=delivery_map.get(p.id) %}{% set delivery_type=d.delivery_type if d else 'manual' %}{% set sold_out=d and d.delivery_type=='automatic' and stock_counts.get(p.id,0)==0 %}
+      <article class="catalog-card" data-name="{{ (p.name ~ ' ' ~ (p.description or '') ~ ' ' ~ (p.category or ''))|lower|e }}" data-category="{{ p.category or 'Dịch vụ' }}" data-delivery="{{ delivery_type }}" data-price="{{ p.price }}" data-created="{{ p.created_at.timestamp() if p.created_at else 0 }}">
+        <a class="product-cover" href="{{ url_for('product_detail',product_id=p.id) }}">
+          {% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="cover-placeholder" style="display:none"><span>{{ (p.category or 'KY')[:2]|upper }}</span><small>KY MMO</small></div>{% else %}<div class="cover-placeholder"><span>{{ (p.category or 'KY')[:2]|upper }}</span><small>KY MMO</small></div>{% endif %}
+          <span class="cover-delivery {{ delivery_type }}">{{ '⚡ Giao ngay' if delivery_type=='automatic' else '💬 Qua ticket' }}</span>
+          <span class="wishlist-button" aria-label="Yêu thích">♡</span>
+        </a>
+        <div class="catalog-card-body">
+          <div class="product-tags"><span class="category-chip">{{ p.category or 'Dịch vụ' }}</span><span class="verified-chip">✓ Đã kiểm duyệt</span></div>
+          <h2><a href="{{ url_for('product_detail',product_id=p.id) }}">{{ p.name }}</a></h2>
+          <p class="muted product-description">{{ p.description }}</p>
+          <div class="rating-row"><span>★★★★★</span><small>Chưa có đánh giá</small></div>
+          <div class="seller-line"><span class="seller-dot">KY</span><span>Seller trên KY MMO</span></div>
+          <div class="price-label">Giá từ</div><div class="price">{{ '{:,.0f}'.format(p.price).replace(',','.') }}₫</div>
+          {% if delivery_type=='automatic' %}<p class="stock-line {{ 'sold-out' if sold_out else '' }}">{{ 'Hết hàng' if sold_out else 'Còn ' ~ stock_counts.get(p.id,0) ~ ' sản phẩm' }}</p>{% else %}<p class="stock-line">Seller giao hàng qua ticket</p>{% endif %}
+          {% if current_user %}<div class="card-actions"><form method="post" action="{{ url_for('add_to_cart',product_id=p.id) }}"><button class="btn btn-cart" {% if sold_out %}disabled{% endif %}>🛒 Thêm vào giỏ</button></form><a class="btn btn-buy{% if sold_out %} disabled{% endif %}" {% if not sold_out %}href="{{ url_for('checkout_product',product_id=p.id) }}"{% endif %}>{{ 'Hết hàng' if sold_out else 'Mua ngay' }}</a></div>{% else %}<a class="btn btn-buy full" href="{{ url_for('auth',mode='login') }}">Đăng nhập để mua</a>{% endif %}
+        </div>
+      </article>
+    {% endfor %}
+    </div>
+    <div class="empty filter-empty" id="filterEmpty" hidden><h3>Không tìm thấy sản phẩm</h3><p>Thử từ khóa khác hoặc xóa bộ lọc.</p></div>
+  </section>
+
+  <section class="market-benefits"><article><span>🛡</span><div><b>Thanh toán an toàn</b><p>Thanh toán bằng số dư ví và theo dõi đơn hàng rõ ràng.</p></div></article><article><span>⚡</span><div><b>Nhận hàng nhanh</b><p>Sản phẩm tự động được giao ngay sau khi thanh toán.</p></div></article><article><span>💬</span><div><b>Hỗ trợ bằng ticket</b><p>Trao đổi trực tiếp với seller ở đơn hàng thủ công.</p></div></article></section>
+
+  <section class="shops-section"><div class="section-title-row"><div><span class="eyebrow">Người bán nổi bật</span><h2>Gian hàng đã xét duyệt</h2></div></div><div class="shop-grid">{% for shop in shops %}<article class="shop-card">{% if shop.avatar_url %}<img src="{{ shop.avatar_url }}" alt="Avatar {{ shop.name }}">{% else %}<div class="shop-avatar">{{ shop.name[:1]|upper }}</div>{% endif %}<div><h3>{{ shop.name }}</h3><p>{{ shop.description }}</p><span>★ {{ '%.1f'|format(shop.rating_average or 0) }} · {{ shop.rating_count }} đánh giá</span></div></article>{% else %}<p class="muted">Chưa có gian hàng Seller.</p>{% endfor %}</div></section>
+</div></main>
+{% include '_site_footer.html' %}
+<script>
+const cards=[...document.querySelectorAll('.catalog-card')],search=document.getElementById('productSearch'),heroSearch=document.getElementById('heroSearch'),category=document.getElementById('categoryFilter'),delivery=document.getElementById('deliveryFilter'),sort=document.getElementById('sortFilter'),grid=document.getElementById('productGrid'),count=document.getElementById('resultCount'),empty=document.getElementById('filterEmpty'),quick=[...document.querySelectorAll('.category-tile')];
+function setQuickActive(button){quick.forEach(x=>x.classList.toggle('active',x===button))}
+function applyFilters(){const q=search.value.trim().toLowerCase(),cat=category.value,del=delivery.value;let visible=cards.filter(c=>(!q||c.dataset.name.includes(q))&&(cat==='all'||c.dataset.category===cat)&&(del==='all'||c.dataset.delivery===del));const mode=sort.value;visible.sort((a,b)=>mode==='price-asc'?+a.dataset.price-+b.dataset.price:mode==='price-desc'?+b.dataset.price-+a.dataset.price:mode==='name'?a.querySelector('h2').textContent.localeCompare(b.querySelector('h2').textContent,'vi'):+b.dataset.created-+a.dataset.created);cards.forEach(c=>c.hidden=true);visible.forEach(c=>{c.hidden=false;grid.appendChild(c)});count.textContent=`${visible.length} sản phẩm`;empty.hidden=visible.length!==0}
+function jumpToCatalog(){document.getElementById('catalogSection').scrollIntoView({behavior:'smooth',block:'start'})}
+search.addEventListener('input',()=>{setQuickActive(null);applyFilters()});[category,delivery,sort].forEach(x=>x.addEventListener('change',()=>{if(x===category)setQuickActive(null);applyFilters()}));quick.forEach(btn=>btn.addEventListener('click',()=>{setQuickActive(btn);search.value=btn.dataset.keyword||'';category.value=btn.dataset.category||'all';applyFilters();jumpToCatalog()}));document.getElementById('clearFilters').addEventListener('click',()=>{search.value='';heroSearch.value='';category.value='all';delivery.value='all';sort.value='newest';setQuickActive(quick[0]);applyFilters()});document.getElementById('heroSearchButton').addEventListener('click',()=>{search.value=heroSearch.value;setQuickActive(null);applyFilters();jumpToCatalog()});heroSearch.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('heroSearchButton').click()});document.querySelector('[data-scroll-catalog]')?.addEventListener('click',jumpToCatalog);document.querySelectorAll('.wishlist-button').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();btn.textContent=btn.textContent==='♡'?'♥':'♡';btn.classList.toggle('active')}));setTimeout(()=>document.querySelectorAll('.toast').forEach(x=>x.remove()),3500);applyFilters();
+</script>
+</body></html>

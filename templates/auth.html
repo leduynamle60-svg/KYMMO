@@ -65,7 +65,12 @@
     border-right:1px solid var(--line);
     position:relative;
   }
-  .brand{display:flex;align-items:center;gap:10px;}
+  .brand{
+    display:flex;align-items:center;gap:10px;
+    color:var(--text-1);text-decoration:none;
+    width:max-content;
+  }
+  .brand:hover,.brand:focus,.brand:visited{color:var(--text-1);text-decoration:none;}
   .brand-mark{
     width:36px;height:36px;border-radius:9px;
     background:linear-gradient(135deg,var(--blue),var(--blue-glow));
@@ -169,6 +174,22 @@
 
   .foot-link{text-align:center;font-size:12.5px;color:var(--text-3);margin-top:18px;}
   .foot-link a{color:var(--blue-glow);font-weight:600;cursor:pointer;}
+  .login-options{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin:-5px 0 10px;
+  }
+  .remember-label{
+    display:inline-flex;align-items:center;gap:8px;
+    color:var(--text-2);font-size:12.5px;cursor:pointer;user-select:none;
+  }
+  .remember-label input{
+    width:16px;height:16px;margin:0;accent-color:var(--blue-glow);cursor:pointer;
+  }
+  .forgot-link{margin:0!important;text-align:right!important;}
+  @media(max-width:420px){
+    .login-options{align-items:flex-start;flex-direction:column;}
+    .forgot-link{text-align:left!important;}
+  }
 
   .step-track{display:flex;align-items:center;gap:6px;margin-bottom:24px;}
   .step-dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:all .3s;}
@@ -186,7 +207,7 @@
 <div class="stage">
   <!-- LEFT BRAND SIDE -->
   <div class="side">
-    <a class="brand" href="{{ url_for('home') }}" style="display:flex;align-items:center;gap:10px;">
+    <a class="brand" href="{{ url_for('home') }}" aria-label="Về trang chủ KY MMO">
       <div class="brand-mark">KY</div>
       <div class="brand-name">KY<span>MMO</span></div>
     </a>
@@ -305,7 +326,13 @@
           <label>Mật khẩu</label>
           <div class="input-wrap"><input type="password" id="login-password" placeholder="Mật khẩu" autocomplete="current-password"></div>
         </div>
-        <div class="foot-link" style="text-align:right;margin-top:-8px;margin-bottom:8px;"><a onclick="showForgot()">Quên mật khẩu?</a></div>
+        <div class="login-options">
+          <label class="remember-label" for="login-remember">
+            <input type="checkbox" id="login-remember">
+            <span>Ghi nhớ đăng nhập trong 30 ngày</span>
+          </label>
+          <div class="foot-link forgot-link"><a onclick="showForgot()">Quên mật khẩu?</a></div>
+        </div>
         <button type="button" class="btn-primary" id="btn-login" onclick="loginAccount()">Đăng nhập</button>
         <div class="status-banner error" id="login-error"></div>
         <div class="foot-link">Chưa có tài khoản? <a onclick="switchTab('register')">Đăng ký ngay</a></div>
@@ -439,6 +466,7 @@
   async function loginAccount() {
     const username = document.getElementById("login-username").value.trim();
     const password = document.getElementById("login-password").value;
+    const remember = document.getElementById("login-remember").checked;
     showStatus("login-error", "");
 
     if (!username || !password) {
@@ -448,7 +476,7 @@
 
     setButtonLoading("btn-login", true, "Đang đăng nhập...", "Đăng nhập");
     try {
-      const data = await apiRequest("/login", { username, password });
+      const data = await apiRequest("/login", { username, password, remember });
       window.location.href = data.redirect_url || "/profile";
     } catch (error) {
       showStatus("login-error", error.message);

@@ -377,8 +377,8 @@
                   <span class="product-tag">{{ product.category }}</span>
                 {% endif %}
 
-                {% if product.delivery_type %}
-                  <span class="product-tag">{{ product.delivery_type }}</span>
+                {% if delivery_label %}
+                  <span class="product-tag">{{ delivery_label }}</span>
                 {% endif %}
 
                 {% if product.warranty %}
@@ -399,8 +399,8 @@
                   <li>Thanh toán an toàn qua hệ thống KY MMO.</li>
                   <li>Đơn hàng được lưu trong lịch sử tài khoản.</li>
                   <li>Có thể liên hệ hỗ trợ khi phát sinh vấn đề.</li>
-                  {% if product.delivery_type %}
-                    <li>Hình thức giao hàng: {{ product.delivery_type }}.</li>
+                  {% if delivery_label %}
+                    <li>Hình thức giao hàng: {{ delivery_label }}.</li>
                   {% endif %}
                   {% if product.warranty %}
                     <li>Thời gian bảo hành: {{ product.warranty }}.</li>
@@ -426,7 +426,7 @@
 
             <div class="buy-row">
               <span>Tình trạng</span>
-              {% if (product.stock or 0) > 0 %}
+              {% if stock_count > 0 %}
                 <strong class="stock-ok">Còn hàng</strong>
               {% else %}
                 <strong class="stock-out">Hết hàng</strong>
@@ -435,12 +435,12 @@
 
             <div class="buy-row">
               <span>Số lượng còn lại</span>
-              <strong>{{ product.stock or 0 }}</strong>
+              <strong>{{ stock_count }}</strong>
             </div>
 
             <div class="buy-row">
               <span>Giao hàng</span>
-              <strong>{{ product.delivery_type or 'Xử lý thủ công' }}</strong>
+              <strong>{{ delivery_label }}</strong>
             </div>
 
             {% if current_user %}
@@ -448,9 +448,9 @@
                 <button
                   type="submit"
                   class="buy-btn"
-                  {% if (product.stock or 0) <= 0 or product.is_active is sameas false %}disabled{% endif %}
+                  {% if stock_count <= 0 or product.is_active is sameas false %}disabled{% endif %}
                 >
-                  {% if (product.stock or 0) <= 0 %}
+                  {% if stock_count <= 0 %}
                     Sản phẩm đã hết hàng
                   {% else %}
                     Mua ngay
@@ -474,7 +474,7 @@
             <div class="seller-box">
               <span>Người bán</span>
               <strong>
-                {{ product.seller_name or 'KY MMO Official' }}
+                {{ seller_name }}
               </strong>
             </div>
           </aside>

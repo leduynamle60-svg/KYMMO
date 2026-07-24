@@ -1,9 +1,123 @@
 <footer class="site-footer">
   <div class="container footer-grid">
-    <div class="footer-brand"><a class="brand" href="{{ url_for('home') }}">KY<b>MMO</b></a><p>Marketplace dành cho tài khoản, gift card và dịch vụ số. Giao dịch minh bạch, seller được xét duyệt và hỗ trợ rõ ràng.</p></div>
-    <div><h3>Hỗ trợ</h3><a href="{{ url_for('support_page') }}">Trung tâm hỗ trợ</a><a href="{{ url_for('orders') if current_user else url_for('auth', mode='login') }}">Đơn hàng của tôi</a>{% if not current_user %}<a href="{{ url_for('auth', mode='login') }}">Trở thành người bán</a>{% elif normalized_role(current_user) == 'buyer' %}<a href="{{ url_for('become_seller') }}">{% if seller_request_status == 'pending' %}Đang chờ xét duyệt{% else %}Trở thành người bán{% endif %}</a>{% endif %}</div>
-    <div><h3>Chính sách</h3><a href="{{ url_for('terms_page') }}">Điều khoản sử dụng</a><a href="{{ url_for('warranty_page') }}">Chính sách bảo hành</a><a href="{{ url_for('refund_page') }}">Chính sách hoàn tiền</a><a href="{{ url_for('privacy_page') }}">Quyền riêng tư</a></div>
-    <div><h3>Cộng đồng</h3><a href="#" aria-label="Discord KY MMO">Discord Community</a><a href="mailto:support@kymmo.vn">Email hỗ trợ</a><span class="footer-note">Link Discord có thể cập nhật sau.</span></div>
+
+    <div class="footer-brand">
+      <a class="brand" href="{{ url_for('home') }}">
+        KY<b>MMO</b>
+      </a>
+
+      <p>
+        Marketplace dành cho tài khoản, gift card và dịch vụ số.
+        Giao dịch minh bạch, seller được xét duyệt và hỗ trợ rõ ràng.
+      </p>
+    </div>
+
+    <div>
+      <h3>Hỗ trợ</h3>
+
+      <a href="{{ url_for('support_page') }}">
+        Trung tâm hỗ trợ
+      </a>
+
+      <a href="{{ url_for('orders') if current_user else url_for('auth', mode='login') }}">
+        Đơn hàng của tôi
+      </a>
+
+      {% if not current_user %}
+        <a href="{{ url_for('auth', mode='login') }}">
+          Trở thành người bán
+        </a>
+      {% elif normalized_role(current_user) == 'buyer' %}
+        <a href="{{ url_for('become_seller') }}">
+          {% if seller_request_status == 'pending' %}
+            Đang chờ xét duyệt
+          {% else %}
+            Trở thành người bán
+          {% endif %}
+        </a>
+      {% endif %}
+    </div>
+
+    <div>
+      <h3>Chính sách</h3>
+
+      <a href="{{ url_for('terms_page') }}">
+        Điều khoản sử dụng
+      </a>
+
+      <a href="{{ url_for('warranty_page') }}">
+        Chính sách bảo hành
+      </a>
+
+      <a href="{{ url_for('refund_page') }}">
+        Chính sách hoàn tiền
+      </a>
+
+      <a href="{{ url_for('privacy_page') }}">
+        Quyền riêng tư
+      </a>
+    </div>
+
+    <div class="footer-community">
+      <h3>Cộng đồng</h3>
+
+      <a
+        class="footer-community-link discord-link"
+        href="https://discord.gg/jq72nkxT9s"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Tham gia Discord KY MMO"
+      >
+        <span class="footer-community-icon">◈</span>
+
+        <span class="footer-community-text">
+          <strong>Discord Community</strong>
+          <small>Tham gia máy chủ KY MMO</small>
+        </span>
+      </a>
+
+      <a
+        class="footer-community-link"
+        href="mailto:support@kymmo.shop"
+      >
+        <span class="footer-community-icon">✉</span>
+
+        <span class="footer-community-text">
+          <strong>Email hỗ trợ</strong>
+          <small>support@kymmo.shop</small>
+        </span>
+      </a>
+
+      <span class="footer-note">
+        Tham gia Discord để được hỗ trợ nhanh nhất.
+      </span>
+    </div>
+
   </div>
-  <div class="container footer-bottom"><span>© 2026 KY MMO. All rights reserved.</span><span>Uy tín · Minh bạch · Hỗ trợ nhanh</span></div>
+
+  <div class="container footer-bottom">
+    <span>© 2026 KY MMO. All rights reserved.</span>
+    <span>Uy tín · Minh bạch · Hỗ trợ nhanh</span>
+  </div>
 </footer>
+<style>
+  .footer-community{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+.footer-community-link{
+    display:flex;
+    align-items:center;
+    padding:12px 14px;
+    border-radius:12px;
+    background:#131d33;
+    text-decoration:none;
+    transition:.2s;
+}
+
+.footer-community-link:hover{
+    background:#1a2744;
+}
+</style>

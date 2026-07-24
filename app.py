@@ -86,6 +86,7 @@ app.config["SECRET_KEY"] = secret_key
 app.config["SESSION_COOKIE_SECURE"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 
 # Khi deploy HTTPS thật trên Render thì đổi thành True.
 app.config["SESSION_COOKIE_SECURE"] = (
@@ -945,9 +946,29 @@ def product_detail(product_id):
             product=None,
         ), 404
 
+    delivery = ProductDelivery.query.filter_by(product_id=product.id).first()
+    shop = Shop.query.filter_by(seller_id=product.seller_id, status="active").first()
+    seller = db.session.get(User, product.seller_id) if product.seller_id else None
+    stock_count = ProductStock.query.filter_by(
+        product_id=product.id,
+        status="available",
+    ).count()
+
+    delivery_label = (
+        "Giao tự động"
+        if delivery and delivery.delivery_type == "automatic"
+        else "Xử lý qua ticket"
+    )
+    seller_name = shop.name if shop else (seller.username if seller else "Người bán")
+
     return render_template(
         "product.html",
         product=product,
+        current_user=current_user(),
+        delivery=delivery,
+        delivery_label=delivery_label,
+        stock_count=stock_count,
+        seller_name=seller_name,
     )
 
 
@@ -1344,6 +1365,12 @@ def seller_dashboard():
     products=Product.query.filter_by(seller_id=user.id).order_by(Product.created_at.desc()).all()
     delivery_map={d.product_id:d for d in ProductDelivery.query.filter(ProductDelivery.product_id.in_([p.id for p in products] or [-1])).all()}
     stock_counts=dict(db.session.query(ProductStock.product_id,func.count(ProductStock.id)).filter_by(status="available").group_by(ProductStock.product_id).all())
+    available_stock_map = {}
+    for stock in ProductStock.query.filter(
+        ProductStock.product_id.in_([p.id for p in products] or [-1]),
+        ProductStock.status == "available",
+    ).order_by(ProductStock.id.asc()).all():
+        available_stock_map.setdefault(stock.product_id, []).append(stock.content)
     seller_orders=MarketplaceOrder.query.filter_by(seller_id=user.id).order_by(MarketplaceOrder.created_at.desc()).all()
 
     # Bù dữ liệu cho các đơn đã thanh toán từ phiên bản cũ: Seller vẫn thấy tiền
@@ -1375,7 +1402,7 @@ def seller_dashboard():
         wallet = SellerWallet.query.filter_by(seller_id=user.id).first()
         holds = SellerHold.query.filter_by(seller_id=user.id).order_by(SellerHold.held_at.desc()).all()
 
-    return render_template("seller-dashboard.html", current_user=user, user=user, shop=shop, wallet=wallet, holds=holds, withdrawals=withdrawals, products=products, delivery_map=delivery_map, stock_counts=stock_counts, seller_orders=seller_orders)
+    return render_template("seller-dashboard.html", current_user=user, user=user, shop=shop, wallet=wallet, holds=holds, withdrawals=withdrawals, products=products, delivery_map=delivery_map, stock_counts=stock_counts, available_stock_map=available_stock_map, seller_orders=seller_orders)
 
 
 @app.post("/seller/products/create")
@@ -1412,8 +1439,18 @@ def seller_create_product():
     if delivery_type == "automatic":
         lines=[x.strip() for x in request.form.get("stock_content","").splitlines() if x.strip()]
         if not lines:
-            db.session.rollback(); flash("Giao tự động cần ít nhất một dòng hàng trong kho.","error"); return redirect(url_for("seller_dashboard"))
-        for line in lines: db.session.add(ProductStock(product_id=product.id,content=line))
+            db.session.rollback(); flash("Giao tự động cần ít nhất một dòng hàng trong kho.","error"); return redirect(url_for("seller_dashboard", tab="products"))
+        for line in lines:
+            db.session.add(ProductStock(product_id=product.id,content=line))
+    else:
+        try:
+            manual_quantity = int(request.form.get("manual_stock_quantity", "0"))
+        except (TypeError, ValueError):
+            manual_quantity = 0
+        if manual_quantity < 1 or manual_quantity > 100000:
+            db.session.rollback(); flash("Hàng giao qua ticket cần số lượng nhận đơn từ 1 đến 100.000.", "error"); return redirect(url_for("seller_dashboard", tab="products"))
+        for _ in range(manual_quantity):
+            db.session.add(ProductStock(product_id=product.id, content="__MANUAL_TICKET_SLOT__"))
     db.session.commit(); flash("Đã đăng sản phẩm.","success")
     return redirect(url_for("seller_dashboard", tab="products"))
 
@@ -1469,10 +1506,33 @@ def seller_edit_product(product_id):
     delivery.delivery_type = delivery_type
     delivery.instructions = instructions
 
-    new_stock = [line.strip() for line in request.form.get("stock_content", "").splitlines() if line.strip()]
+    edited_stock = [line.strip() for line in request.form.get("stock_content", "").splitlines() if line.strip()]
     if delivery_type == "automatic":
-        for line in new_stock:
+        # Form chỉnh sửa là nguồn kho hiện tại: thay toàn bộ các dòng còn available,
+        # nhưng giữ nguyên lịch sử hàng đã bán/đã gắn với đơn cũ.
+        ProductStock.query.filter_by(
+            product_id=product.id,
+            status="available",
+        ).delete(synchronize_session=False)
+        for line in edited_stock:
             db.session.add(ProductStock(product_id=product.id, content=line))
+    else:
+        try:
+            target_quantity = int(request.form.get("manual_stock_target", "0"))
+        except (TypeError, ValueError):
+            target_quantity = -1
+        if target_quantity < 0 or target_quantity > 100000:
+            flash("Stock qua ticket phải từ 0 đến 100.000.", "error")
+            return redirect(url_for("seller_dashboard", tab="products"))
+
+        # Chuyển sang giao ticket thì xóa mọi hàng available cũ, sau đó tạo đúng
+        # số slot seller nhập. Các hàng đã bán vẫn được giữ để bảo toàn lịch sử.
+        ProductStock.query.filter_by(
+            product_id=product.id,
+            status="available",
+        ).delete(synchronize_session=False)
+        for _ in range(target_quantity):
+            db.session.add(ProductStock(product_id=product.id, content="__MANUAL_TICKET_SLOT__"))
 
     db.session.commit()
     if image_url != old_image_url and old_image_url:
@@ -1503,10 +1563,25 @@ def seller_add_stock(product_id):
     user=current_user(); product=db.session.get(Product,product_id)
     if not product or product.seller_id != user.id: flash("Không tìm thấy sản phẩm.","error"); return redirect(url_for("seller_dashboard", tab="products"))
     delivery=ProductDelivery.query.filter_by(product_id=product.id).first()
-    if not delivery or delivery.delivery_type != "automatic": flash("Chỉ sản phẩm giao tự động mới có kho hàng.","error"); return redirect(url_for("seller_dashboard", tab="products"))
-    lines=[x.strip() for x in request.form.get("stock_content","").splitlines() if x.strip()]
-    for line in lines: db.session.add(ProductStock(product_id=product.id,content=line))
-    db.session.commit(); flash(f"Đã thêm {len(lines)} hàng vào kho.","success")
+    if not delivery:
+        flash("Sản phẩm chưa được cấu hình cách giao hàng.", "error")
+        return redirect(url_for("seller_dashboard", tab="products"))
+    if delivery.delivery_type == "automatic":
+        lines=[x.strip() for x in request.form.get("stock_content","").splitlines() if x.strip()]
+        for line in lines:
+            db.session.add(ProductStock(product_id=product.id,content=line))
+        added = len(lines)
+    else:
+        try:
+            added = int(request.form.get("manual_stock_quantity", "0"))
+        except (TypeError, ValueError):
+            added = 0
+        if added < 1 or added > 100000:
+            flash("Số lượng cần thêm phải từ 1 đến 100.000.", "error")
+            return redirect(url_for("seller_dashboard", tab="products"))
+        for _ in range(added):
+            db.session.add(ProductStock(product_id=product.id, content="__MANUAL_TICKET_SLOT__"))
+    db.session.commit(); flash(f"Đã thêm {added} hàng vào kho.","success")
     return redirect(url_for("seller_dashboard", tab="products"))
 
 
@@ -1556,23 +1631,21 @@ def complete_checkout():
             if not delivery:
                 raise ValueError(f"Sản phẩm {product.name} chưa được cấu hình cách giao hàng.")
 
-            available_stocks = []
-            if delivery.delivery_type == "automatic":
-                available_stocks = (
-                    ProductStock.query
-                    .filter_by(product_id=product.id, status="available")
-                    .with_for_update()
-                    .limit(quantity)
-                    .all()
+            available_stocks = (
+                ProductStock.query
+                .filter_by(product_id=product.id, status="available")
+                .with_for_update()
+                .limit(quantity)
+                .all()
+            )
+            if len(available_stocks) < quantity:
+                raise ValueError(
+                    f"Sản phẩm {product.name} chỉ còn {len(available_stocks)} hàng trong kho, "
+                    f"không đủ số lượng {quantity}."
                 )
-                if len(available_stocks) < quantity:
-                    raise ValueError(
-                        f"Sản phẩm {product.name} chỉ còn {len(available_stocks)} hàng trong kho, "
-                        f"không đủ số lượng {quantity}."
-                    )
 
             for index in range(quantity):
-                stock = available_stocks[index] if available_stocks else None
+                stock = available_stocks[index]
                 order = MarketplaceOrder(
                     reference="KY" + secrets.token_hex(5).upper(),
                     buyer_id=buyer.id,
@@ -1580,15 +1653,15 @@ def complete_checkout():
                     product_id=product.id,
                     amount=product.price,
                     delivery_type=delivery.delivery_type,
-                    status="delivered" if stock else "processing",
+                    status="delivered" if delivery.delivery_type == "automatic" else "processing",
                 )
                 db.session.add(order)
                 db.session.flush()
 
-                if stock:
-                    stock.status = "sold"
-                    stock.order_id = order.id
-                    stock.sold_at = utc_now()
+                stock.status = "sold"
+                stock.order_id = order.id
+                stock.sold_at = utc_now()
+                if delivery.delivery_type == "automatic":
                     order.delivered_content = stock.content
                     order.delivered_at = utc_now()
                 else:
@@ -2025,6 +2098,8 @@ def login():
         data.get("password", "")
     )
 
+    remember = bool(data.get("remember", False))
+
     if not account or not password:
         return json_error(
             "Vui lòng nhập đầy đủ tên người dùng hoặc Gmail và mật khẩu."
@@ -2058,6 +2133,7 @@ def login():
         )
 
     session.clear()
+    session.permanent = remember
     session["user_id"] = user.id
     session["username"] = user.username
     session["role"] = user.role
@@ -2291,6 +2367,8 @@ def register():
         )
 
     session.clear()
+    # Tài khoản vừa đăng ký được ghi nhớ trong 30 ngày trên thiết bị này.
+    session.permanent = True
     session["user_id"] = user.id
     session["username"] = user.username
     session["role"] = user.role

@@ -41,7 +41,7 @@ function bindImagePreview(input, preview){
       img.onload=()=>{
         preview.innerHTML=`<img src="${reader.result}" alt="Xem trước ảnh sản phẩm">`;
         if(img.width<800 || img.height<800){
-          alert(`Ảnh của ông chỉ có ${img.width}×${img.height}px. Khuyến nghị tối thiểu 800×800px để ảnh không bị mờ.`);
+          alert(`Ảnh của bạn chỉ có ${img.width}×${img.height}px. Khuyến nghị tối thiểu 800×800px để ảnh không bị mờ.`);
         }
       };
       img.src=reader.result;

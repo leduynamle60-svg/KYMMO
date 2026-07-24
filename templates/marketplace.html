@@ -9,7 +9,7 @@
 </head>
 <body>
 {% include '_public_nav.html' %}
-<div class="trust-marquee"><div class="trust-track"><span>Uy tín và minh bạch</span><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Hỗ trợ nhanh chóng</span><span>Sản phẩm số đa dạng</span><span>Uy tín và minh bạch</span><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Hỗ trợ nhanh chóng</span><span>Sản phẩm số đa dạng</span></div></div>
+<div class="trust-marquee" aria-label="Thông báo KY MMO"><div class="trust-track">{% for item in site_announcements %}<span>{{ item }}</span>{% endfor %}{% for item in site_announcements %}<span>{{ item }}</span>{% endfor %}</div></div>
 <div class="toast-stack" id="toastStack">{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="toast {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}</div>
 
 <main class="page marketplace-page"><div class="shell">

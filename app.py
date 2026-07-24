@@ -244,6 +244,28 @@ class SitePage(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
+class SiteSetting(db.Model):
+    __tablename__ = "site_settings"
+    id = db.Column(db.Integer, primary_key=True)
+    setting_key = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    setting_value = db.Column(db.Text, nullable=False, default="")
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+SITE_SETTING_DEFAULTS = {
+    "footer_description": "Marketplace dành cho tài khoản, gift card và dịch vụ số. Giao dịch minh bạch, seller được xét duyệt và hỗ trợ rõ ràng.",
+    "discord_url": "https://discord.gg/3ES353BXY9",
+    "support_email": "support@kymmo.shop",
+    "footer_note": "Tham gia Discord để được hỗ trợ nhanh nhất.",
+    "footer_copyright": "© 2026 KY MMO. All rights reserved.",
+    "footer_slogan": "Uy tín · Minh bạch · Hỗ trợ nhanh",
+    "announcement_lines": "Seller được xét duyệt\nGiao hàng tự động 24/7\nThông tin sản phẩm minh bạch\nHỗ trợ nhanh chóng\nThanh toán bằng ví an toàn",
+}
+
+def get_site_settings():
+    rows = {row.setting_key: row.setting_value for row in SiteSetting.query.all()}
+    return {key: rows.get(key, default) for key, default in SITE_SETTING_DEFAULTS.items()}
+
 
 class SellerRequest(db.Model):
     __tablename__="seller_requests"
@@ -2173,6 +2195,8 @@ def inject_current_user():
         "seller_request_status": seller_request_status,
         "cart_count": sum(cart_quantities.values()),
         "normalized_role": normalized_role,
+        "site_settings": get_site_settings(),
+        "site_announcements": [line.strip() for line in get_site_settings().get("announcement_lines", "").splitlines() if line.strip()],
     }
 
 
@@ -2621,6 +2645,24 @@ def admin_site_content():
     if active_key not in pages:
         active_key = "terms"
     return render_template("admin-site-content.html", current_user=current_user(), pages=pages, active_key=active_key)
+
+
+@app.route("/admin/site-settings", methods=["GET", "POST"])
+@admin_required
+def admin_site_settings():
+    if request.method == "POST":
+        for key, default in SITE_SETTING_DEFAULTS.items():
+            value = request.form.get(key, default).strip()
+            row = SiteSetting.query.filter_by(setting_key=key).first()
+            if row is None:
+                row = SiteSetting(setting_key=key, setting_value=value)
+                db.session.add(row)
+            else:
+                row.setting_value = value
+        db.session.commit()
+        flash("Đã lưu cài đặt website.", "success")
+        return redirect(url_for("admin_site_settings"))
+    return render_template("admin-site-settings.html", current_user=current_user(), settings=get_site_settings())
 
 # =========================================================
 # NẠP TIỀN THỦ CÔNG

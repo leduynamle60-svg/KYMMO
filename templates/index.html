@@ -1,6 +1,6 @@
 <!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KY MMO</title>{% include '_public_style.html' %}{% include '_professional_ui.html' %}</head><body>
 {% include '_public_nav.html' %}
-<div class="trust-marquee" aria-label="Cam kết của KY MMO"><div class="trust-track"><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Thông tin sản phẩm minh bạch</span><span>Hỗ trợ nhanh chóng</span><span>Thanh toán bằng ví an toàn</span><span>Seller được xét duyệt</span><span>Giao hàng tự động 24/7</span><span>Thông tin sản phẩm minh bạch</span><span>Hỗ trợ nhanh chóng</span><span>Thanh toán bằng ví an toàn</span></div></div>
+<div class="trust-marquee" aria-label="Thông báo KY MMO"><div class="trust-track">{% for item in site_announcements %}<span>{{ item }}</span>{% endfor %}{% for item in site_announcements %}<span>{{ item }}</span>{% endfor %}</div></div>
 <main><section class="hero home-hero"><div class="container"><span class="eyebrow">KY MMO Marketplace</span><h1>Mua bán sản phẩm số <span>nhanh và an toàn</span></h1><p>Tìm tài khoản, gift card và dịch vụ số từ các seller đã được xét duyệt. Thanh toán qua ví KY MMO, theo dõi đơn hàng rõ ràng và được bảo vệ trong 7 ngày.</p><div class="hero-actions">
   <a class="btn primary" href="{{ url_for('marketplace') }}">Khám phá sản phẩm</a>
   {% if not current_user %}

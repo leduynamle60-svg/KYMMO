@@ -123,44 +123,15 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 db = SQLAlchemy(app)
 
 # =========================================================
-# GMAIL SMTP
+# RESEND EMAIL API
 # =========================================================
 
-app.config["MAIL_SERVER"] = os.getenv(
-    "MAIL_SERVER",
-    "smtp.gmail.com",
-)
-
-app.config["MAIL_PORT"] = int(
-    os.getenv("MAIL_PORT", "587")
-)
-
-app.config["MAIL_USE_TLS"] = (
-    os.getenv("MAIL_USE_TLS", "True").lower() == "true"
-)
-
-app.config["MAIL_USE_SSL"] = (
-    os.getenv("MAIL_USE_SSL", "False").lower() == "true"
-)
-
-app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
-app.config["MAIL_DEFAULT_SENDER"] = ("KY MMO", app.config["MAIL_USERNAME"])
-
-if not app.config["MAIL_USERNAME"]:
+# Resend sử dụng HTTPS API nên chạy được trên Render Free.
+# RESEND_FROM_EMAIL có thể để mặc định onboarding@resend.dev khi test.
+if not os.getenv("RESEND_API_KEY"):
     raise RuntimeError(
-        "Thiếu MAIL_USERNAME trong file .env."
+        "Thiếu RESEND_API_KEY trong file .env."
     )
-
-if not app.config["MAIL_PASSWORD"]:
-    raise RuntimeError(
-        "Thiếu MAIL_PASSWORD trong file .env."
-    )
-
-app.config["MAIL_DEFAULT_SENDER"] = (
-    "KY MMO",
-    app.config["MAIL_USERNAME"],
-)
 
 mail.init_app(app)
 
@@ -575,11 +546,11 @@ def create_and_send_otp(
 
         return (
             False,
-            "Không thể gửi Gmail lúc này. "
-            "Vui lòng kiểm tra cấu hình SMTP.",
+            "Không thể gửi email lúc này. "
+            "Vui lòng kiểm tra cấu hình Resend.",
         )
 
-    return True, "Đã gửi mã OTP đến Gmail của bạn."
+    return True, "Đã gửi mã OTP đến email của bạn."
 
 
 def verify_otp_code(
@@ -1911,7 +1882,7 @@ def process_seller_request(req_id, action):
         message = "Đã từ chối yêu cầu Seller."
 
     if not email_ok:
-        message += " Tuy nhiên email thông báo chưa gửi được; hãy kiểm tra SMTP."
+        message += " Tuy nhiên email thông báo chưa gửi được; hãy kiểm tra Resend."
 
     flash(message, "success" if email_ok else "warning")
     return redirect(url_for("admin"))

@@ -1,8 +1,56 @@
-from flask import current_app
-from flask_mail import Mail, Message
+import os
+from typing import Any
+
+import requests
 
 
-mail = Mail()
+class _MailCompat:
+    """Giữ tương thích với app.py cũ nếu vẫn gọi mail.init_app(app)."""
+
+    def init_app(self, app: Any) -> None:
+        return None
+
+
+mail = _MailCompat()
+
+
+def _send_resend_email(
+    *,
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+) -> None:
+    api_key = os.getenv("RESEND_API_KEY")
+    if not api_key:
+        raise RuntimeError("Thiếu biến môi trường RESEND_API_KEY")
+
+    from_email = os.getenv(
+        "RESEND_FROM_EMAIL",
+        "KY MMO <onboarding@resend.dev>",
+    )
+
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "text": text_body,
+            "html": html_body,
+        },
+        timeout=20,
+    )
+
+    if not response.ok:
+        raise RuntimeError(
+            f"Resend gửi email thất bại "
+            f"(HTTP {response.status_code}): {response.text[:1000]}"
+        )
 
 
 def send_otp_email(
@@ -31,15 +79,7 @@ def send_otp_email(
             "trên KY MMO."
         )
 
-    sender = current_app.config["MAIL_USERNAME"]
-
-    message = Message(
-        subject=subject,
-        sender=sender,
-        recipients=[email],
-    )
-
-    message.body = f"""
+    text_body = f"""
 KY MMO
 
 {title}
@@ -60,7 +100,7 @@ hãy bỏ qua email.
 KY MMO
 """
 
-    message.html = f"""
+    html_body = f"""
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -174,7 +214,13 @@ KY MMO
 </html>
 """
 
-    mail.send(message)
+    _send_resend_email(
+        to_email=email,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+    )
+
 
 def send_seller_status_email(
     email: str,
@@ -184,8 +230,6 @@ def send_seller_status_email(
     note: str | None = None,
 ) -> None:
     """Gửi kết quả xét duyệt đăng ký Seller."""
-    sender = current_app.config.get("MAIL_DEFAULT_SENDER") or current_app.config["MAIL_USERNAME"]
-
     if approved:
         subject = "🎉 Chúc mừng! Bạn đã trở thành Seller của KY MMO"
         heading = "Yêu cầu Seller đã được duyệt"
@@ -239,13 +283,7 @@ KY MMO"""
         <p style="margin-top:20px">Bạn có thể bổ sung thông tin và gửi lại yêu cầu sau.</p>
         """
 
-    message = Message(
-        subject=subject,
-        sender=sender,
-        recipients=[email],
-        body=body_text,
-    )
-    message.html = f"""
+    html_body = f"""
     <!doctype html>
     <html lang="vi"><body style="margin:0;padding:30px;background:#060b18;font-family:Arial,sans-serif;color:#f3f6fc">
       <div style="max-width:620px;margin:auto;background:#0c1428;border:1px solid #1c2b4d;border-radius:18px;overflow:hidden">
@@ -261,7 +299,12 @@ KY MMO"""
       </div>
     </body></html>
     """
-    mail.send(message)
+    _send_resend_email(
+        to_email=email,
+        subject=subject,
+        text_body=body_text,
+        html_body=html_body,
+    )
 
 
 
@@ -275,11 +318,6 @@ def send_order_confirmation_email(
 ) -> None:
     """Gửi biên nhận và thông tin giao hàng sau khi thanh toán thành công."""
     from html import escape
-
-    sender = (
-        current_app.config.get("MAIL_DEFAULT_SENDER")
-        or current_app.config["MAIL_USERNAME"]
-    )
 
     def money(value) -> str:
         return f"{int(value or 0):,}".replace(",", ".") + "₫"
@@ -362,13 +400,9 @@ def send_order_confirmation_email(
         "KY MMO",
     ])
 
-    message = Message(
-        subject=f"KY MMO - Thanh toán thành công ({len(orders)} đơn hàng)",
-        sender=sender,
-        recipients=[email],
-        body="\n".join(plain_lines),
-    )
-    message.html = f"""
+    subject = f"KY MMO - Thanh toán thành công ({len(orders)} đơn hàng)"
+    text_body = "\n".join(plain_lines)
+    html_body = f"""
     <!doctype html>
     <html lang="vi">
       <body style="margin:0;padding:0;background:#f3f5f8;font-family:Arial,sans-serif;color:#101828">
@@ -408,4 +442,9 @@ def send_order_confirmation_email(
       </body>
     </html>
     """
-    mail.send(message)
+    _send_resend_email(
+        to_email=email,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+    )

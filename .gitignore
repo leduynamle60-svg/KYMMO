@@ -1,14 +1,55 @@
+# Python
 __pycache__/
-*.pyc
-.env
-venv/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
 .venv/
+venv/
+env/
+ENV/
 
+# Environment variables
+.env
+
+# Flask
 instance/
+.flaskenv
 
-static/uploads/
+# Logs
+*.log
+logs/
 
+# Database (nếu dùng SQLite)
 *.db
 *.sqlite3
 
+# Uploads (nếu không muốn lưu ảnh lên Git)
+# static/uploads/
+
+# VS Code
 .vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Python build
+build/
+dist/
+*.egg-info/
+
+# pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/

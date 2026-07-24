@@ -5,10 +5,36 @@ import requests
 
 
 class _MailCompat:
-    """Giữ tương thích với app.py cũ nếu vẫn gọi mail.init_app(app)."""
+    """Lớp tương thích Flask-Mail, nhưng gửi thực tế qua Resend API."""
 
     def init_app(self, app: Any) -> None:
         return None
+
+    def send(self, message: Any) -> None:
+        """Nhận đối tượng Flask-Mail Message để code cũ vẫn hoạt động."""
+        recipients = list(getattr(message, "recipients", None) or [])
+        if not recipients:
+            raise ValueError("Email không có người nhận.")
+
+        subject = str(getattr(message, "subject", "KY MMO") or "KY MMO")
+        text_body = str(getattr(message, "body", "") or "")
+        html_body = str(getattr(message, "html", "") or "")
+        if not html_body:
+            escaped = (
+                text_body.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\n", "<br>")
+            )
+            html_body = f"<div style='font-family:Arial,sans-serif;line-height:1.7'>{escaped}</div>"
+
+        for recipient in recipients:
+            _send_resend_email(
+                to_email=str(recipient),
+                subject=subject,
+                text_body=text_body,
+                html_body=html_body,
+            )
 
 
 mail = _MailCompat()

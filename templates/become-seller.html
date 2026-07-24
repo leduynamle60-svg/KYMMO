@@ -17,7 +17,7 @@
     <div><strong>Tên gian hàng:</strong> {{ existing_request.shop_name }}</div>
     <div><strong>Danh mục:</strong> {{ existing_request.category }}</div>
     <div><strong>Trạng thái:</strong> Đang chờ duyệt</div>
-    <div><strong>Ngày gửi:</strong> {{ existing_request.created_at.strftime('%d/%m/%Y %H:%M') if existing_request.created_at else 'Chưa có dữ liệu' }}</div>
+    <div><strong>Ngày gửi:</strong> {{ existing_request.created_at | vn_time if existing_request.created_at else 'Chưa có dữ liệu' }}</div>
   </div>
   <div class="warning-box">Bạn không cần gửi lại yêu cầu. Hệ thống đã khóa form để tránh gửi trùng.</div>
   <div class="status-actions"><a class="btn primary" href="{{ url_for('home') }}">Về trang chủ</a><a class="btn" href="{{ url_for('profile') }}">Xem hồ sơ</a></div>

@@ -317,15 +317,26 @@
     }
 
     @media(max-width:560px){
+      .product-page{padding:22px 12px 58px;}
+      .product-shell{width:100%;}
+      .product-breadcrumb{font-size:12px;overflow-wrap:anywhere;}
       .product-content,
-      .buy-card{
-        padding:20px;
-      }
-
+      .buy-card{padding:18px;}
+      .product-card{border-radius:15px;}
       .product-cover,
-      .product-cover img{
-        min-height:240px;
-      }
+      .product-cover img{min-height:210px;max-height:320px;}
+      .product-title{font-size:27px;overflow-wrap:anywhere;}
+      .product-subtitle,.product-description{font-size:13px;}
+      .buy-price{font-size:30px;}
+      .buy-row{align-items:flex-start;}
+      .buy-row strong{max-width:58%;overflow-wrap:anywhere;}
+      .buy-btn{min-height:50px;}
+    }
+
+    @media(min-width:901px){
+      .product-grid{grid-template-columns:minmax(0,1fr) minmax(300px,360px);}
+      .product-main{min-width:0;}
+      .product-cover img{width:100%;height:100%;object-fit:cover;}
     }
   </style>
 {% include '_professional_ui.html' %}</head>
@@ -433,7 +444,7 @@
             </div>
 
             {% if current_user %}
-              <form method="post" action="{{ url_for('create_order', product_id=product.id) }}">
+              <form method="post" action="{{ url_for('buy_product', product_id=product.id) }}">
                 <button
                   type="submit"
                   class="buy-btn"

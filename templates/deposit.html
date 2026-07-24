@@ -8,7 +8,7 @@
   <style>
     .deposit-page{min-height:calc(100vh - 80px);padding:42px 20px 80px;background:radial-gradient(circle at 10% 0%,rgba(22,87,255,.13),transparent 34%),#070d19}
     .deposit-shell{width:min(1120px,100%);margin:auto}
-    .deposit-title{margin-bottom:22px}.deposit-title h1{margin:0 0 7px;color:#f5f7ff;font-size:36px}.deposit-title p{margin:0;color:#8da0c3}
+    .deposit-title{margin-bottom:22px}.deposit-title h1{margin:0 0 7px;color:#f5f7ff;font-size:clamp(28px,5vw,36px)}.deposit-title p{margin:0;color:#8da0c3;line-height:1.6}
     .deposit-grid{display:grid;grid-template-columns:390px 1fr;gap:22px;align-items:start}
     .card{border:1px solid #21314f;border-radius:18px;background:#0a1324;box-shadow:0 20px 55px rgba(0,0,0,.24)}
     .create-card{padding:24px;position:sticky;top:100px}.create-card h2,.history-card h2{margin:0;color:#f5f7ff;font-size:20px}
@@ -29,7 +29,9 @@
     .reason{margin-top:10px;padding:10px;border-radius:9px;background:rgba(255,113,136,.07);color:#ff9bad;font-size:12px}
     .empty{margin-top:16px;padding:42px 16px;text-align:center;border:1px dashed #2b3d5e;border-radius:13px;color:#8294b5}
     .flash{margin-bottom:16px;padding:13px 15px;border-radius:11px;background:#101f36;color:#dce8fb}
-    @media(max-width:850px){.deposit-grid{grid-template-columns:1fr}.create-card{position:static}}
+    .expiry{margin-top:10px;color:#f6c85e;font-size:12px;font-weight:700}.expired{color:#ff7188}
+    @media(max-width:850px){.deposit-page{padding:28px 14px 64px}.deposit-grid{grid-template-columns:1fr}.create-card{position:static}.history-card,.create-card{padding:18px}}
+    @media(max-width:520px){.deposit-top{align-items:flex-start;flex-direction:column;gap:5px}.deposit-amount{font-size:18px}.bank-row{align-items:flex-start}.bank-row strong{max-width:58%;overflow-wrap:anywhere}.deposit-item{padding:14px}.qr-box img{width:min(210px,100%)}}
   </style>
 {% include '_professional_ui.html' %}</head>
 <body>
@@ -38,7 +40,7 @@
     <div class="deposit-shell">
       <div class="deposit-title">
         <h1>Nạp tiền</h1>
-        <p>Tạo yêu cầu, chuyển khoản đúng nội dung rồi chờ admin xác nhận.</p>
+        <p>Tạo yêu cầu, chuyển khoản đúng nội dung rồi chờ admin xác nhận. Mỗi mã chỉ có hiệu lực {{ deposit_expire_minutes }} phút.</p>
       </div>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -86,6 +88,12 @@
                 {% endif %}
               </div>
 
+              {% if deposit.status == 'processing' %}
+                <div class="expiry" data-deadline="{{ deposit_deadline(deposit).isoformat() }}">
+                  Mã còn hiệu lực: <span class="countdown">đang tính...</span>
+                </div>
+              {% endif %}
+
               <span class="status {{ deposit.status }}">
                 {% if deposit.status == 'processing' %}Đang xử lý
                 {% elif deposit.status == 'completed' %}Hoàn thành
@@ -111,5 +119,27 @@
       </div>
     </div>
   </main>
+  <script>
+    (() => {
+      const update = () => {
+        document.querySelectorAll('[data-deadline]').forEach((box) => {
+          const target = new Date(box.dataset.deadline).getTime();
+          const remaining = target - Date.now();
+          const label = box.querySelector('.countdown');
+          if (remaining <= 0) {
+            box.classList.add('expired');
+            label.textContent = 'đã hết hạn';
+            return;
+          }
+          const totalSeconds = Math.floor(remaining / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          label.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+        });
+      };
+      update();
+      setInterval(update, 1000);
+    })();
+  </script>
 </body>
 </html>

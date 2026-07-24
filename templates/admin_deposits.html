@@ -14,7 +14,8 @@
     button,input{font:inherit}.approve{min-height:40px;padding:0 15px;border:0;border-radius:9px;background:#1bbf91;color:#fff;font-weight:800;cursor:pointer}
     .reject-form{display:flex;gap:8px;flex:1}.reject-form input{flex:1;min-width:180px;padding:0 11px;border:1px solid #30415f;border-radius:9px;background:#07111f;color:#fff}
     .reject{min-height:40px;padding:0 15px;border:0;border-radius:9px;background:#e65069;color:#fff;font-weight:800;cursor:pointer}
-    .done{color:#2bd7ac}.failed{color:#ff7188}
+    .done{color:#2bd7ac}.failed{color:#ff7188}.expires{color:#f6c85e}
+    @media(max-width:650px){.page{padding:28px 12px 64px}.item{padding:15px}.top{flex-direction:column;gap:5px}.reject-form{flex-direction:column;width:100%}.reject-form input{width:100%;min-height:42px;box-sizing:border-box}.actions form:first-child,.approve,.reject{width:100%}.meta{overflow-wrap:anywhere}}
   </style>
 {% include '_professional_ui.html' %}</head>
 <body>
@@ -40,6 +41,8 @@
             Khách: {{ deposit.user.username }} · {{ deposit.user.email }}<br>
             Nội dung CK: <strong>{{ deposit.transfer_content }}</strong><br>
             Tài khoản nhận: {{ deposit.bank_name }} · {{ deposit.account_number }} · {{ deposit.account_name }}<br>
+            Tạo lúc: {{ vietnam_time(deposit.created_at).strftime('%d/%m/%Y %H:%M') if deposit.created_at else 'Không rõ' }}<br>
+            {% if deposit.status == 'processing' %}<span class="expires">Hết hiệu lực: {{ vietnam_time(deposit_deadline(deposit)).strftime('%d/%m/%Y %H:%M') }}</span><br>{% endif %}
             Trạng thái:
             {% if deposit.status == 'completed' %}<strong class="done">Hoàn thành</strong>
             {% elif deposit.status == 'failed' %}<strong class="failed">Thất bại</strong>

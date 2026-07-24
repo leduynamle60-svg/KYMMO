@@ -5,7 +5,7 @@ import os
 import secrets
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 from urllib.parse import quote
@@ -55,6 +55,11 @@ def init_deposit(app, db, User, mail):
         max_deposit = Decimal("10000000")
 
     vietnam_tz = ZoneInfo("Asia/Ho_Chi_Minh")
+
+    try:
+        deposit_expire_minutes = max(1, int(os.getenv("DEPOSIT_EXPIRE_MINUTES", "30")))
+    except ValueError:
+        deposit_expire_minutes = 30
 
     def utcnow():
         # Lưu UTC trong database để nhất quán khi deploy.
@@ -219,6 +224,36 @@ def init_deposit(app, db, User, mail):
 
         return wrapped
 
+    def deposit_deadline(deposit):
+        created_at = deposit.created_at or utcnow()
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        return created_at + timedelta(minutes=deposit_expire_minutes)
+
+    def is_deposit_expired(deposit, now=None):
+        if deposit.status != "processing":
+            return False
+        return (now or utcnow()) >= deposit_deadline(deposit)
+
+    def expire_stale_deposits(user_id=None):
+        query = select(DepositRequest).where(DepositRequest.status == "processing")
+        if user_id is not None:
+            query = query.where(DepositRequest.user_id == user_id)
+        changed = False
+        now = utcnow()
+        for item in db.session.scalars(query).all():
+            if is_deposit_expired(item, now):
+                item.status = "failed"
+                item.failure_reason = (
+                    f"Mã nạp đã hết hiệu lực sau {deposit_expire_minutes} phút."
+                )
+                item.processed_at = now
+                item.wallet_credited = False
+                changed = True
+        if changed:
+            db.session.commit()
+        return changed
+
     def make_code():
         while True:
             code = f"NAP{secrets.randbelow(900000) + 100000}"
@@ -360,6 +395,7 @@ def init_deposit(app, db, User, mail):
     @login_required
     def deposit_page():
         user = current_user()
+        expire_stale_deposits(user.id)
 
         deposits = db.session.scalars(
             select(DepositRequest)
@@ -380,6 +416,8 @@ def init_deposit(app, db, User, mail):
             qr_url=qr_url,
             money=money,
             vietnam_time=vietnam_time,
+            deposit_deadline=deposit_deadline,
+            deposit_expire_minutes=deposit_expire_minutes,
         )
 
     @deposit_bp.post("/wallet/deposit/create")
@@ -465,7 +503,8 @@ def init_deposit(app, db, User, mail):
         flash(
             (
                 "Đã tạo yêu cầu nạp tiền. "
-                "Vui lòng chuyển đúng số tiền và nội dung."
+                f"Mã có hiệu lực trong {deposit_expire_minutes} phút; "
+                "vui lòng chuyển đúng số tiền và nội dung."
             ),
             "success",
         )
@@ -476,6 +515,7 @@ def init_deposit(app, db, User, mail):
     @deposit_view_required
     def admin_deposits():
         user = current_user()
+        expire_stale_deposits()
 
         status_filter = (
             request.args.get("status") or "all"
@@ -501,6 +541,8 @@ def init_deposit(app, db, User, mail):
             is_founder=is_founder(user),
             money=money,
             vietnam_time=vietnam_time,
+            deposit_deadline=deposit_deadline,
+            deposit_expire_minutes=deposit_expire_minutes,
         )
 
     @deposit_bp.post(
@@ -519,6 +561,16 @@ def init_deposit(app, db, User, mail):
 
             if not deposit:
                 flash("Không tìm thấy yêu cầu nạp tiền.", "error")
+                return redirect(url_for("deposit.admin_deposits"))
+
+            if is_deposit_expired(deposit):
+                deposit.status = "failed"
+                deposit.failure_reason = (
+                    f"Mã nạp đã hết hiệu lực sau {deposit_expire_minutes} phút."
+                )
+                deposit.processed_at = utcnow()
+                db.session.commit()
+                flash("Mã nạp này đã hết hiệu lực, không thể duyệt.", "error")
                 return redirect(url_for("deposit.admin_deposits"))
 
             if (

@@ -329,7 +329,7 @@
                 <div class="info-label">Ngày tham gia</div>
                 <div class="info-value">
                   {% if current_user.created_at %}
-                    {{ current_user.created_at.strftime('%d/%m/%Y %H:%M') }}
+                    {{ current_user.created_at | vn_time }}
                   {% else %}
                     Chưa có dữ liệu
                   {% endif %}

@@ -46,14 +46,14 @@ def _send_resend_email(
     subject: str,
     text_body: str,
     html_body: str,
-) -> None:
+) -> str:
     api_key = os.getenv("RESEND_API_KEY")
     if not api_key:
         raise RuntimeError("Thiếu biến môi trường RESEND_API_KEY")
 
     from_email = os.getenv(
         "RESEND_FROM_EMAIL",
-        "KY MMO <onboarding@resend.dev>",
+        "KY MMO <noreply@kymmo.shop>",
     )
 
     response = requests.post(
@@ -68,6 +68,10 @@ def _send_resend_email(
             "subject": subject,
             "text": text_body,
             "html": html_body,
+            "reply_to": os.getenv("RESEND_REPLY_TO", "support@kymmo.shop"),
+            "headers": {
+                "X-Entity-Ref-ID": f"kymmo-otp-{os.urandom(8).hex()}"
+            },
         },
         timeout=20,
     )
@@ -78,13 +82,20 @@ def _send_resend_email(
             f"(HTTP {response.status_code}): {response.text[:1000]}"
         )
 
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+
+    return str(payload.get("id") or "")
+
 
 def send_otp_email(
     email: str,
     otp: str,
     purpose: str,
     expire_minutes: int = 5,
-) -> None:
+) -> str:
     if purpose == "forgot_password":
         subject = "Mã đặt lại mật khẩu KY MMO"
 
@@ -240,7 +251,7 @@ KY MMO
 </html>
 """
 
-    _send_resend_email(
+    return _send_resend_email(
         to_email=email,
         subject=subject,
         text_body=text_body,

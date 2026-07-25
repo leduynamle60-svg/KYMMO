@@ -246,6 +246,7 @@
     <nav class="links">
       <a href="{{ url_for('marketplace') }}">Khám phá</a>
       <a href="{{ url_for('support_page') }}">Hỗ trợ</a>
+      {% if current_user %}<a href="{{ url_for('refund_center') }}" style="font-weight:900;color:#ffcf66">Refund</a>{% endif %}
     </nav>
 
     <div class="actions">
@@ -307,6 +308,7 @@
             </a>
 
             <a href="{{ url_for('orders') }}"><span>Đơn hàng</span><span>›</span></a>
+            <a href="{{ url_for('refund_center') }}"><span>Yêu cầu refund</span><span>›</span></a>
             {% set nav_role = (current_user.role or 'buyer')|lower %}
             {% if nav_role in ['seller','admin','founder','owner'] %}<a href="{{ url_for('seller_dashboard') }}"><span>Seller Dashboard</span><span>›</span></a>{% endif %}
             {% if nav_role in ['admin','founder','owner'] %}<a href="{{ url_for('admin') }}"><span>Dashboard quản trị</span><span>›</span></a>{% endif %}
@@ -353,3 +355,16 @@
     });
   })();
 </script>
+{% if current_user and current_user.seller_welcome_pending %}
+<div id="seller-welcome-modal" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:20px">
+  <div style="width:min(520px,100%);background:#0d1729;border:1px solid #294166;border-radius:22px;padding:30px;color:#eef5ff;box-shadow:0 30px 90px #000">
+    <div style="font-size:42px">🎉</div><h2>Chúc mừng! Bạn đã trở thành Seller</h2>
+    <p style="color:#9fb0ca;line-height:1.7">Hãy tham gia Discord KY MMO để nhận thông báo, cập nhật quy định và được hỗ trợ nhanh hơn.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a href="{{ site_settings.discord_url if site_settings else '#' }}" target="_blank" style="padding:12px 16px;border-radius:12px;background:#5865f2;color:white;text-decoration:none;font-weight:900">Tham gia Discord</a>
+      <button type="button" onclick="dismissSellerWelcome()" style="padding:12px 16px;border-radius:12px;border:1px solid #314866;background:#101d31;color:#fff;font-weight:800">Tôi đã hiểu</button>
+    </div>
+  </div>
+</div>
+<script>async function dismissSellerWelcome(){await fetch('{{ url_for("dismiss_seller_welcome") }}',{method:'POST'});document.getElementById('seller-welcome-modal').remove();}</script>
+{% endif %}

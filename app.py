@@ -27,6 +27,11 @@ from sqlalchemy import func, select
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
+try:
+    from authlib.integrations.flask_client import OAuth
+except ImportError:
+    OAuth = None
+
 from mail import (
     mail,
     send_order_confirmation_email,
@@ -57,7 +62,7 @@ def vn_time_filter(value, fmt="%d/%m/%Y %H:%M"):
 
 
 ALLOWED_PRODUCT_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
-app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 120 * 1024 * 1024
 
 # Supabase Storage. Bucket must be PUBLIC so product images can be displayed.
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
@@ -123,6 +128,9 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 
 db = SQLAlchemy(app)
 
+# OAuth xã hội là tùy chọn: web vẫn chạy bình thường khi chưa cấu hình.
+oauth = OAuth(app) if OAuth else None
+
 # =========================================================
 # RESEND EMAIL API
 # =========================================================
@@ -141,7 +149,7 @@ mail.init_app(app)
 # =========================================================
 
 OTP_EXPIRE_MINUTES = 5
-OTP_RESEND_SECONDS = 30
+OTP_RESEND_SECONDS = 300
 OTP_MAX_ATTEMPTS = 5
 
 VALID_OTP_PURPOSES = {
@@ -212,6 +220,11 @@ class User(db.Model):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    google_id = db.Column(db.String(255), unique=True, index=True)
+    discord_id = db.Column(db.String(255), unique=True, index=True)
+    avatar_url = db.Column(db.Text)
+    seller_welcome_pending = db.Column(db.Boolean, nullable=False, default=False)
+
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
 
@@ -232,6 +245,7 @@ class Product(db.Model):
     price = db.Column(db.BigInteger, nullable=False, default=0)
     seller_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+    canonical_key = db.Column(db.String(180), index=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
@@ -340,6 +354,35 @@ class TicketMessage(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey("marketplace_orders.id"), nullable=False, index=True)
     sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class RefundRequest(db.Model):
+    __tablename__ = "refund_requests"
+    id = db.Column(db.Integer, primary_key=True)
+    reference = db.Column(db.String(40), nullable=False, unique=True, index=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("marketplace_orders.id"), nullable=False, index=True)
+    buyer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    reason = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="pending", index=True)
+    seller_decision = db.Column(db.String(20), nullable=False, default="pending")
+    seller_note = db.Column(db.Text)
+    admin_decision = db.Column(db.String(20), nullable=False, default="pending")
+    admin_note = db.Column(db.Text)
+    processed_by = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    attachments = db.relationship("RefundAttachment", backref="refund_request", lazy=True, cascade="all, delete-orphan")
+
+
+class RefundAttachment(db.Model):
+    __tablename__ = "refund_attachments"
+    id = db.Column(db.Integer, primary_key=True)
+    refund_id = db.Column(db.Integer, db.ForeignKey("refund_requests.id"), nullable=False, index=True)
+    file_url = db.Column(db.Text, nullable=False)
+    file_type = db.Column(db.String(20), nullable=False)
+    original_name = db.Column(db.String(255))
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
@@ -521,59 +564,70 @@ def create_and_send_otp(
                 "trước khi gửi lại mã.",
             )
 
-    # Vô hiệu hóa các mã cũ
-    (
-        OtpCode.query
-        .filter_by(
-            email=email,
-            purpose=purpose,
-            is_used=False,
-        )
-        .update({
-            "is_used": True,
-        })
-    )
-
     otp = generate_otp_code()
 
-    otp_record = OtpCode(
-        email=email,
-        purpose=purpose,
-        code_hash=generate_password_hash(otp),
-        attempts=0,
-        is_used=False,
-        expires_at=now + timedelta(
-            minutes=OTP_EXPIRE_MINUTES,
-        ),
-    )
-
-    db.session.add(otp_record)
-    db.session.commit()
-
+    # Chỉ lưu/vô hiệu hóa mã cũ SAU KHI Resend nhận email thành công.
+    # Như vậy nếu nhà cung cấp email lỗi, mã OTP cũ vẫn còn dùng được.
     try:
-        send_otp_email(
+        resend_email_id = send_otp_email(
             email=email,
             otp=otp,
             purpose=purpose,
             expire_minutes=OTP_EXPIRE_MINUTES,
         )
-
-    except Exception:
+    except Exception as exc:
         app.logger.exception(
-            "Không gửi được email OTP tới %s",
+            "Không gửi được email OTP tới %s: %s",
             email,
+            exc,
         )
-
-        db.session.delete(otp_record)
-        db.session.commit()
-
         return (
             False,
-            "Không thể gửi email lúc này. "
-            "Vui lòng kiểm tra cấu hình Resend.",
+            "Không thể gửi email lúc này. Vui lòng thử lại sau ít phút.",
         )
 
-    return True, "Đã gửi mã OTP đến email của bạn."
+    try:
+        (
+            OtpCode.query
+            .filter_by(
+                email=email,
+                purpose=purpose,
+                is_used=False,
+            )
+            .update({"is_used": True})
+        )
+
+        otp_record = OtpCode(
+            email=email,
+            purpose=purpose,
+            code_hash=generate_password_hash(otp),
+            attempts=0,
+            is_used=False,
+            expires_at=now + timedelta(minutes=OTP_EXPIRE_MINUTES),
+        )
+        db.session.add(otp_record)
+        db.session.execute(db.text("ALTER TABLE products ADD COLUMN IF NOT EXISTS canonical_key VARCHAR(180)"))
+        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)"))
+        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS discord_id VARCHAR(255)"))
+        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT"))
+        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_welcome_pending BOOLEAN NOT NULL DEFAULT FALSE"))
+        db.session.execute(db.text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id) WHERE google_id IS NOT NULL"))
+        db.session.execute(db.text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_discord_id ON users (discord_id) WHERE discord_id IS NOT NULL"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Không lưu được OTP cho %s", email)
+        return False, "Không thể tạo mã OTP lúc này. Vui lòng thử lại."
+
+    app.logger.info(
+        "OTP đã được Resend chấp nhận: email=%s resend_id=%s",
+        email,
+        resend_email_id or "unknown",
+    )
+    return True, (
+        "Đã gửi mã OTP. Vui lòng kiểm tra Hộp thư đến, "
+        "Quảng cáo và Thư rác."
+    )
 
 
 def verify_otp_code(
@@ -943,6 +997,24 @@ def auth():
     return render_template("auth.html")
 
 
+def canonical_product_key(name: str) -> str:
+    value = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
+    return value or "product"
+
+
+def seller_offer_data(product):
+    shop = Shop.query.filter_by(seller_id=product.seller_id, status="active").first()
+    seller = db.session.get(User, product.seller_id) if product.seller_id else None
+    delivery = ProductDelivery.query.filter_by(product_id=product.id).first()
+    stock = ProductStock.query.filter_by(product_id=product.id, status="available").count()
+    return {
+        "product": product, "shop": shop, "seller": seller, "delivery": delivery, "stock": stock,
+        "seller_name": shop.name if shop else (seller.username if seller else "Người bán"),
+        "rating": float(shop.rating_average or 0) if shop else 0,
+        "rating_count": int(shop.rating_count or 0) if shop else 0,
+    }
+
+
 @app.get("/marketplace")
 def marketplace():
     products = Product.query.filter_by(is_active=True).order_by(Product.created_at.desc()).all()
@@ -983,14 +1055,14 @@ def product_detail(product_id):
     )
     seller_name = shop.name if shop else (seller.username if seller else "Người bán")
 
+    key = product.canonical_key or canonical_product_key(product.name)
+    candidates = Product.query.filter_by(is_active=True).all()
+    matching = [p for p in candidates if (p.canonical_key or canonical_product_key(p.name)) == key]
+    offers = sorted((seller_offer_data(p) for p in matching), key=lambda item: (int(item["product"].price), -item["rating"]))
+
     return render_template(
-        "product.html",
-        product=product,
-        current_user=current_user(),
-        delivery=delivery,
-        delivery_label=delivery_label,
-        stock_count=stock_count,
-        seller_name=seller_name,
+        "product.html", product=product, current_user=current_user(), delivery=delivery,
+        delivery_label=delivery_label, stock_count=stock_count, seller_name=seller_name, offers=offers,
     )
 
 
@@ -1455,7 +1527,7 @@ def seller_create_product():
     if not name or not description or price < 1000 or delivery_type not in {"automatic","manual"}:
         flash("Thông tin sản phẩm hoặc cách giao hàng không hợp lệ.", "error")
         return redirect(url_for("seller_dashboard", tab="products"))
-    product=Product(name=name,description=description,category=category,image_url=image_url,price=price,seller_id=user.id,is_active=True)
+    product=Product(name=name,description=description,category=category,image_url=image_url,price=price,seller_id=user.id,is_active=True,canonical_key=canonical_product_key(name))
     db.session.add(product); db.session.flush()
     db.session.add(ProductDelivery(product_id=product.id,delivery_type=delivery_type,instructions=instructions))
     if delivery_type == "automatic":
@@ -1937,6 +2009,7 @@ def process_seller_request(req_id, action):
 
     if action == "approve":
         target.role = "seller"
+        target.seller_welcome_pending = True
         if not SellerWallet.query.filter_by(seller_id=target.id).first():
             db.session.add(SellerWallet(seller_id=target.id))
 
@@ -2601,6 +2674,160 @@ def get_site_page(page_key):
         db.session.commit()
     return page
 
+
+# =========================================================
+# OAUTH GOOGLE / DISCORD
+# =========================================================
+def _oauth_ready(provider):
+    return bool(oauth and os.getenv(f"{provider.upper()}_CLIENT_ID") and os.getenv(f"{provider.upper()}_CLIENT_SECRET"))
+
+if oauth:
+    if _oauth_ready("google"):
+        oauth.register(name="google", client_id=os.getenv("GOOGLE_CLIENT_ID"), client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            server_metadata_url="https://accounts.google.com/.well-known/openid-configuration", client_kwargs={"scope":"openid email profile"})
+    if _oauth_ready("discord"):
+        oauth.register(name="discord", client_id=os.getenv("DISCORD_CLIENT_ID"), client_secret=os.getenv("DISCORD_CLIENT_SECRET"),
+            access_token_url="https://discord.com/api/oauth2/token", authorize_url="https://discord.com/oauth2/authorize",
+            api_base_url="https://discord.com/api/", client_kwargs={"scope":"identify email"})
+
+def _unique_social_username(base):
+    base = normalize_username(re.sub(r"[^A-Za-z0-9._]", "", base or "user"))[:24] or "user"
+    candidate = base
+    while User.query.filter(func.lower(User.username)==candidate.lower()).first():
+        candidate = f"{base[:20]}_{secrets.token_hex(2)}"
+    return candidate
+
+def _social_login(provider, provider_id, email, username, avatar=None):
+    email = normalize_email(email)
+    if not email:
+        flash("Tài khoản xã hội không cung cấp email hợp lệ.", "error"); return redirect(url_for("auth"))
+    id_column = User.google_id if provider == "google" else User.discord_id
+    user = User.query.filter(id_column == str(provider_id)).first() or User.query.filter(func.lower(User.email)==email).first()
+    if not user:
+        user = User(email=email, username=_unique_social_username(username), role="buyer", balance=0, is_active=True,
+                    password_hash=generate_password_hash(secrets.token_urlsafe(32)))
+        db.session.add(user)
+    if provider == "google": user.google_id = str(provider_id)
+    else: user.discord_id = str(provider_id)
+    if avatar: user.avatar_url = avatar
+    db.session.commit(); session.clear(); session.permanent=True
+    session.update(user_id=user.id, username=user.username, role=user.role)
+    return redirect(url_for("profile"))
+
+@app.get("/login/google")
+def login_google():
+    if not _oauth_ready("google"): flash("Google Login chưa được cấu hình.", "error"); return redirect(url_for("auth"))
+    return oauth.google.authorize_redirect(url_for("google_callback", _external=True, _scheme="https" if request.is_secure else "http"))
+
+@app.get("/auth/google/callback")
+def google_callback():
+    token=oauth.google.authorize_access_token(); info=token.get("userinfo") or oauth.google.userinfo()
+    return _social_login("google", info.get("sub"), info.get("email"), info.get("name") or info.get("email","").split("@")[0], info.get("picture"))
+
+@app.get("/login/discord")
+def login_discord():
+    if not _oauth_ready("discord"): flash("Discord Login chưa được cấu hình.", "error"); return redirect(url_for("auth"))
+    return oauth.discord.authorize_redirect(url_for("discord_callback", _external=True, _scheme="https" if request.is_secure else "http"))
+
+@app.get("/auth/discord/callback")
+def discord_callback():
+    oauth.discord.authorize_access_token(); info=oauth.discord.get("users/@me").json()
+    avatar=f"https://cdn.discordapp.com/avatars/{info['id']}/{info['avatar']}.png" if info.get("avatar") else None
+    return _social_login("discord", info.get("id"), info.get("email"), info.get("global_name") or info.get("username"), avatar)
+
+# =========================================================
+# REFUND CENTER - buyer + seller + admin cùng theo dõi
+# =========================================================
+ALLOWED_REFUND_EXTENSIONS={"png","jpg","jpeg","webp","gif","mp4","webm","mov"}
+
+def _save_refund_file(file, refund_reference):
+    ext=(file.filename.rsplit(".",1)[-1].lower() if "." in file.filename else "")
+    if ext not in ALLOWED_REFUND_EXTENSIONS: raise ValueError("Chỉ nhận ảnh PNG/JPG/WEBP/GIF hoặc video MP4/WEBM/MOV.")
+    data=file.read()
+    if len(data)>20*1024*1024: raise ValueError("Mỗi tệp tối đa 20 MB.")
+    object_path=f"refunds/{refund_reference}/{secrets.token_hex(8)}-{secure_filename(file.filename)}"
+    _supabase_storage_request("POST", object_path, data, file.mimetype or "application/octet-stream")
+    return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/{quote(object_path)}", ("video" if ext in {"mp4","webm","mov"} else "image")
+
+@app.route("/refund", methods=["GET","POST"])
+@login_required
+def refund_center():
+    user=current_user()
+    if request.method=="POST":
+        order_ref=request.form.get("order_reference","").strip().upper(); reason=request.form.get("reason","").strip()
+        order=MarketplaceOrder.query.filter_by(reference=order_ref, buyer_id=user.id).first()
+        if not order: flash("Không tìm thấy đơn hàng thuộc tài khoản của bạn.","error"); return redirect(url_for("refund_center"))
+        if len(reason)<15: flash("Lý do refund cần ít nhất 15 ký tự.","error"); return redirect(url_for("refund_center"))
+        existing=RefundRequest.query.filter_by(order_id=order.id).filter(RefundRequest.status.in_(["pending","approved"])).first()
+        if existing: flash("Đơn hàng này đã có yêu cầu refund đang xử lý.","error"); return redirect(url_for("refund_center"))
+        rr=RefundRequest(reference=f"RF-{datetime.now(VN_TIMEZONE):%Y%m%d}-{secrets.token_hex(3).upper()}", order_id=order.id,buyer_id=user.id,seller_id=order.seller_id,reason=reason)
+        db.session.add(rr); db.session.flush()
+        try:
+            for f in request.files.getlist("attachments")[:6]:
+                if f and f.filename:
+                    url,typ=_save_refund_file(f,rr.reference); db.session.add(RefundAttachment(refund_id=rr.id,file_url=url,file_type=typ,original_name=secure_filename(f.filename)))
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback(); app.logger.exception("Upload bằng chứng refund thất bại"); flash(str(exc),"error"); return redirect(url_for("refund_center"))
+        send_discord_webhook("💰 YÊU CẦU REFUND MỚI",f"**Refund:** {rr.reference}\n**Đơn:** {order.reference}\n**Buyer:** {user.username}\n**Seller ID:** {order.seller_id}\n**Lý do:** {reason}\nCần Seller và Admin/Founder cùng duyệt.",0xF39C12)
+        flash("Đã gửi yêu cầu refund.","success"); return redirect(url_for("refund_center"))
+    requests_q=RefundRequest.query.filter_by(buyer_id=user.id).order_by(RefundRequest.created_at.desc()).all()
+    return render_template("refund-center.html",current_user=user,refunds=requests_q)
+
+@app.get("/seller/refunds")
+@login_required
+def seller_refunds():
+    user=current_user()
+    if normalized_role(user) not in {"seller","admin","founder"}: return redirect(url_for("profile"))
+    rows=RefundRequest.query.filter_by(seller_id=user.id).order_by(RefundRequest.created_at.desc()).all()
+    return render_template("refund-manage.html",current_user=user,refunds=rows,mode="seller")
+
+@app.post("/seller/refunds/<int:refund_id>/<action>")
+@login_required
+def seller_refund_action(refund_id,action):
+    user=current_user(); rr=RefundRequest.query.get_or_404(refund_id)
+    if rr.seller_id!=user.id or action not in {"approve","reject"}: flash("Không có quyền xử lý.","error"); return redirect(url_for("seller_refunds"))
+    rr.seller_decision=action; rr.seller_note=request.form.get("note","").strip() or None
+    _finalize_refund(rr); db.session.commit(); return redirect(url_for("seller_refunds"))
+
+@app.get("/admin/refunds")
+@admin_required
+def admin_refunds():
+    rows=RefundRequest.query.order_by(RefundRequest.created_at.desc()).all()
+    return render_template("refund-manage.html",current_user=current_user(),refunds=rows,mode="admin")
+
+@app.post("/admin/refunds/<int:refund_id>/<action>")
+@admin_required
+def admin_refund_action(refund_id,action):
+    rr=RefundRequest.query.get_or_404(refund_id)
+    if action not in {"approve","reject"}: return redirect(url_for("admin_refunds"))
+    rr.admin_decision=action; rr.admin_note=request.form.get("note","").strip() or None; rr.processed_by=current_user().id
+    _finalize_refund(rr); db.session.commit(); return redirect(url_for("admin_refunds"))
+
+def _finalize_refund(rr):
+    if "reject" in {rr.seller_decision,rr.admin_decision}: rr.status="rejected"; return
+    if rr.seller_decision=="approve" and rr.admin_decision=="approve":
+        order=db.session.get(MarketplaceOrder,rr.order_id); buyer=db.session.get(User,rr.buyer_id)
+        if rr.status!="approved":
+            buyer.balance=int(buyer.balance or 0)+int(order.amount); order.status="refunded"; rr.status="approved"
+            hold=SellerHold.query.filter_by(order_reference=order.reference).first()
+            if hold:
+                wallet=SellerWallet.query.filter_by(seller_id=rr.seller_id).first()
+                if hold.status=="holding":
+                    hold.status="refunded"
+                    if wallet: wallet.pending_balance=max(0,int(wallet.pending_balance or 0)-int(hold.seller_amount or 0))
+                elif hold.status=="released" and wallet:
+                    if int(wallet.available_balance or 0) < int(hold.seller_amount or 0):
+                        raise ValueError("Số dư khả dụng của Seller không đủ để hoàn tiền.")
+                    wallet.available_balance=int(wallet.available_balance or 0)-int(hold.seller_amount or 0)
+                    hold.status="refunded"
+            send_discord_webhook("✅ REFUND ĐÃ HOÀN TẤT",f"**Refund:** {rr.reference}\n**Đơn:** {order.reference}\n**Số tiền:** {int(order.amount):,}đ",0x2ECC71)
+
+@app.post("/seller-welcome/dismiss")
+@login_required
+def dismiss_seller_welcome():
+    user=current_user(); user.seller_welcome_pending=False; db.session.commit(); return jsonify({"success":True})
+
 @app.get("/support")
 def support_page():
     page = get_site_page("support")
@@ -2616,8 +2843,8 @@ def privacy_page():
     page = get_site_page("privacy")
     return render_template("info-page.html", current_user=current_user(), page=page)
 
-@app.get("/refund")
-def refund_page():
+@app.get("/refund-policy")
+def refund_policy_page():
     page = get_site_page("refund")
     return render_template("info-page.html", current_user=current_user(), page=page)
 

@@ -201,7 +201,11 @@
     .side{display:none;}
   }
 </style>
-{% include '_professional_ui.html' %}</head>
+{% include '_professional_ui.html' %}
+<style>
+.social-login{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 18px}.social-btn{display:flex;align-items:center;justify-content:center;gap:9px;min-height:44px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.03);color:var(--text-1);font-weight:800;text-decoration:none}.social-btn:hover{border-color:#4d87ff;background:rgba(77,135,255,.08)}.social-sep{display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:12px;margin:4px 0 16px}.social-sep:before,.social-sep:after{content:"";height:1px;background:var(--border);flex:1}@media(max-width:520px){.social-login{grid-template-columns:1fr}}
+</style>
+</head>
 <body>
 
 <div class="stage">
@@ -228,6 +232,13 @@
       <button class="tab active" data-tab="register" onclick="switchTab('register')">Đăng ký</button>
       <button class="tab" data-tab="login" onclick="switchTab('login')">Đăng nhập</button>
     </div>
+
+
+    <div class="social-login">
+      <a class="social-btn" href="{{ url_for('login_google') }}">G&nbsp; Tiếp tục với Google</a>
+      <a class="social-btn" href="{{ url_for('login_discord') }}">◉&nbsp; Tiếp tục với Discord</a>
+    </div>
+    <div class="social-sep">hoặc dùng Gmail</div>
 
     <!-- ================= REGISTER PANEL ================= -->
     <div class="panel active" id="panel-register">
@@ -277,18 +288,22 @@
       <div id="reg-step-2" style="display:none;">
         <div class="field">
           <label style="color:var(--text-1);font-size:14px;">Xác minh Gmail</label>
-          <div class="hint" style="margin-top:0;margin-bottom:14px;">
+          <div class="hint" style="margin-top:0;margin-bottom:10px;">
             Bọn mình đã gửi mã xác minh gồm 6 số đến <b id="target-email" style="color:var(--text-1);"></b>. Nhập mã để hoàn tất đăng ký.
+          </div>
+          <div class="hint" style="margin:0 0 14px;line-height:1.55;">
+            Không thấy email? Hãy kiểm tra <b>Thư rác</b>, <b>Quảng cáo</b> và <b>Tất cả thư</b>.
+            Để tránh hệ thống chống spam, vui lòng chờ đủ <b>5 phút</b> trước khi gửi lại.
           </div>
         </div>
 
         <div class="otp-row">
-          <input class="otp-box" maxlength="1" oninput="otpMove(this,0)">
-          <input class="otp-box" maxlength="1" oninput="otpMove(this,1)">
-          <input class="otp-box" maxlength="1" oninput="otpMove(this,2)">
-          <input class="otp-box" maxlength="1" oninput="otpMove(this,3)">
-          <input class="otp-box" maxlength="1" oninput="otpMove(this,4)">
-          <input class="otp-box" maxlength="1" oninput="otpMove(this,5)">
+          <input class="otp-box" maxlength="1" inputmode="numeric" autocomplete="one-time-code" oninput="otpMove(this,0)">
+          <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,1)">
+          <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,2)">
+          <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,3)">
+          <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,4)">
+          <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,5)">
         </div>
 
         <div class="verify-banner" id="otp-fail" style="background:rgba(255,92,114,.08);border-color:rgba(255,92,114,.3);color:var(--danger);">
@@ -726,7 +741,11 @@
     document.getElementById("btn-continue").disabled = !ok;
   }
 
+  let registerOtpRequestInFlight = false;
+
   async function goToVerify() {
+    if (registerOtpRequestInFlight) return;
+    registerOtpRequestInFlight = true;
     const email = document.getElementById("reg-email").value.trim();
     showStatus("register-send-error", "");
     setButtonLoading("btn-continue", true, "Đang gửi mã...", "Tiếp tục xác minh Gmail");
@@ -742,10 +761,11 @@
       document.getElementById("dot-1").classList.remove("active");
       document.getElementById("dot-2").classList.add("active");
       clearOtpBoxes("#reg-step-2 .otp-box");
-      startResendTimer(30);
+      startResendTimer(300);
     } catch (error) {
       showStatus("register-send-error", error.message);
     } finally {
+      registerOtpRequestInFlight = false;
       setButtonLoading("btn-continue", false, "Đang gửi mã...", "Tiếp tục xác minh Gmail");
       checkFormValid();
     }
@@ -842,11 +862,13 @@ async function checkOtp() {
   }
 
   async function resendOtp() {
+    if (registerOtpRequestInFlight) return;
     const secondsLeft = Math.ceil((state.resendUntil - Date.now()) / 1000);
     if (secondsLeft > 0) return;
 
     const failBanner = document.getElementById("otp-fail");
     failBanner.classList.remove("show");
+    registerOtpRequestInFlight = true;
 
     try {
       await apiRequest("/send-otp", {
@@ -854,10 +876,12 @@ async function checkOtp() {
         purpose: "register"
       });
       clearOtpBoxes("#reg-step-2 .otp-box");
-      startResendTimer(30);
+      startResendTimer(300);
     } catch (error) {
       failBanner.textContent = `✕ ${error.message}`;
       failBanner.classList.add("show");
+    } finally {
+      registerOtpRequestInFlight = false;
     }
   }
 

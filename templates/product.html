@@ -61,10 +61,10 @@
     .product-cover img{
       width:100%;
       height:100%;
-      min-height:330px;
+      
       object-fit:contain;
       object-position:center;
-      padding:18px;
+      padding:12px;
       display:block;
     }
 
@@ -320,7 +320,7 @@
       .product-shell{width:100%;}
       .product-breadcrumb{font-size:12px;overflow-wrap:anywhere;}
       .product-content,
-      .buy-card{padding:18px;}
+      .buy-card{padding:12px;}
       .product-card{border-radius:15px;}
       .product-cover{height:230px;}
       .product-cover img{min-height:0;max-height:none;}
@@ -346,7 +346,7 @@
     height:100%;
     object-fit:contain;
     object-position:center;
-    padding:18px;
+    padding:12px;
   }
 }
   </style>
@@ -502,5 +502,22 @@
       {% endif %}
     </div>
   </main>
+
+{% if offers and offers|length > 1 %}
+<section style="width:min(1160px,calc(100% - 40px));margin:28px auto 70px">
+  <h2 style="color:#fff;margin:0 0 14px">{{ offers|length }} offer cho sản phẩm này</h2>
+  <div style="display:grid;gap:10px">
+  {% for offer in offers %}
+    <div style="display:grid;grid-template-columns:minmax(180px,1fr) 150px 150px 130px;gap:16px;align-items:center;padding:18px 20px;border:1px solid #263b5e;border-radius:15px;background:#0c1730;color:#fff">
+      <div><strong>{{ offer.seller_name }}</strong><div style="color:#8ea2c2;font-size:12px;margin-top:5px">⭐ {{ '%.2f'|format(offer.rating) }} · {{ offer.rating_count }} đánh giá</div></div>
+      <div style="color:#9db0cc;font-size:13px">{{ 'Giao tự động' if offer.delivery and offer.delivery.delivery_type == 'automatic' else 'Qua ticket' }}<br>Còn {{ offer.stock }}</div>
+      <strong style="font-size:22px;color:#31ddb1">{{ "{:,.0f}".format(offer.product.price).replace(',', '.') }}₫</strong>
+      <a href="{{ url_for('product_detail', product_id=offer.product.id) }}" style="text-align:center;padding:12px;border:1px solid #6d91ff;border-radius:10px;color:#fff;text-decoration:none;font-weight:900">Chọn offer</a>
+    </div>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 </body>
 </html>

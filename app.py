@@ -25,12 +25,19 @@ from flask import (
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, select
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 try:
     from authlib.integrations.flask_client import OAuth
 except ImportError:
     OAuth = None
+
+try:
+    from authlib.integrations.base_client.errors import MismatchingStateError
+except ImportError:
+    class MismatchingStateError(Exception):
+        pass
 
 from mail import (
     mail,
@@ -44,6 +51,8 @@ load_dotenv()
 
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+app.config["PREFERRED_URL_SCHEME"] = "https"
 
 VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -2707,26 +2716,82 @@ def _social_login(provider, provider_id, email, username, avatar=None):
     session.update(user_id=user.id, username=user.username, role=user.role)
     return redirect(url_for("profile"))
 
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "https://kymmo.shop/auth/google/callback",
+).strip()
+
+DISCORD_REDIRECT_URI = os.getenv(
+    "DISCORD_REDIRECT_URI",
+    "https://kymmo.shop/auth/discord/callback",
+).strip()
+
+
 @app.get("/login/google")
 def login_google():
-    if not _oauth_ready("google"): flash("Google Login chưa được cấu hình.", "error"); return redirect(url_for("auth"))
-    return oauth.google.authorize_redirect(url_for("google_callback", _external=True, _scheme="https" if request.is_secure else "http"))
+    if not _oauth_ready("google"):
+        flash("Google Login chưa được cấu hình.", "error")
+        return redirect(url_for("auth", mode="login"))
+
+    return oauth.google.authorize_redirect(GOOGLE_REDIRECT_URI)
+
 
 @app.get("/auth/google/callback")
 def google_callback():
-    token=oauth.google.authorize_access_token(); info=token.get("userinfo") or oauth.google.userinfo()
-    return _social_login("google", info.get("sub"), info.get("email"), info.get("name") or info.get("email","").split("@")[0], info.get("picture"))
+    try:
+        token = oauth.google.authorize_access_token()
+    except MismatchingStateError:
+        session.clear()
+        flash("Phiên đăng nhập Google không khớp hoặc đã hết hạn. Vui lòng thử lại.", "error")
+        return redirect(url_for("auth", mode="login"))
+
+    info = token.get("userinfo") or oauth.google.userinfo()
+    return _social_login(
+        "google",
+        info.get("sub"),
+        info.get("email"),
+        info.get("name") or info.get("email", "").split("@")[0],
+        info.get("picture"),
+    )
+
 
 @app.get("/login/discord")
 def login_discord():
-    if not _oauth_ready("discord"): flash("Discord Login chưa được cấu hình.", "error"); return redirect(url_for("auth"))
-    return oauth.discord.authorize_redirect(url_for("discord_callback", _external=True, _scheme="https" if request.is_secure else "http"))
+    if not _oauth_ready("discord"):
+        flash("Discord Login chưa được cấu hình.", "error")
+        return redirect(url_for("auth", mode="login"))
+
+    return oauth.discord.authorize_redirect(DISCORD_REDIRECT_URI)
+
 
 @app.get("/auth/discord/callback")
 def discord_callback():
-    oauth.discord.authorize_access_token(); info=oauth.discord.get("users/@me").json()
-    avatar=f"https://cdn.discordapp.com/avatars/{info['id']}/{info['avatar']}.png" if info.get("avatar") else None
-    return _social_login("discord", info.get("id"), info.get("email"), info.get("global_name") or info.get("username"), avatar)
+    try:
+        oauth.discord.authorize_access_token()
+    except MismatchingStateError:
+        session.clear()
+        flash("Phiên đăng nhập Discord không khớp hoặc đã hết hạn. Vui lòng thử lại.", "error")
+        return redirect(url_for("auth", mode="login"))
+
+    response = oauth.discord.get("users/@me")
+    if response.status_code != 200:
+        app.logger.error("Discord user API lỗi: status=%s body=%s", response.status_code, response.text)
+        flash("Không thể lấy thông tin tài khoản Discord.", "error")
+        return redirect(url_for("auth", mode="login"))
+
+    info = response.json()
+    avatar = (
+        f"https://cdn.discordapp.com/avatars/{info['id']}/{info['avatar']}.png"
+        if info.get("id") and info.get("avatar")
+        else None
+    )
+    return _social_login(
+        "discord",
+        info.get("id"),
+        info.get("email"),
+        info.get("global_name") or info.get("username"),
+        avatar,
+    )
 
 # =========================================================
 # REFUND CENTER - buyer + seller + admin cùng theo dõi

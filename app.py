@@ -606,13 +606,6 @@ def create_and_send_otp(
             expires_at=now + timedelta(minutes=OTP_EXPIRE_MINUTES),
         )
         db.session.add(otp_record)
-        db.session.execute(db.text("ALTER TABLE products ADD COLUMN IF NOT EXISTS canonical_key VARCHAR(180)"))
-        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)"))
-        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS discord_id VARCHAR(255)"))
-        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT"))
-        db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_welcome_pending BOOLEAN NOT NULL DEFAULT FALSE"))
-        db.session.execute(db.text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id) WHERE google_id IS NOT NULL"))
-        db.session.execute(db.text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_discord_id ON users (discord_id) WHERE discord_id IS NOT NULL"))
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -2904,20 +2897,46 @@ DepositRequest = init_deposit(app, db, User, mail)
 # KHỞI TẠO DATABASE
 # =========================================================
 
-with app.app_context():
-    db.create_all()
-    # db.create_all không thêm cột mới vào bảng cũ; migration nhẹ cho PostgreSQL.
+def run_lightweight_database_migrations() -> None:
+    """Bổ sung các cột/index mới cho database cũ.
+
+    ``db.create_all()`` chỉ tạo bảng chưa tồn tại, không tự thêm cột vào
+    bảng đã có. Các câu lệnh PostgreSQL dưới đây có thể chạy lặp lại an toàn.
+    """
+    statements = [
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(60) NOT NULL DEFAULT 'Dịch vụ'",
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT",
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS canonical_key VARCHAR(180)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS discord_id VARCHAR(255)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_welcome_pending BOOLEAN NOT NULL DEFAULT FALSE",
+        "CREATE INDEX IF NOT EXISTS ix_products_canonical_key ON products (canonical_key)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id) WHERE google_id IS NOT NULL",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_discord_id ON users (discord_id) WHERE discord_id IS NOT NULL",
+    ]
+
     try:
-        db.session.execute(db.text(
-            "ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(60) NOT NULL DEFAULT 'Dịch vụ'"
-        ))
-        db.session.execute(db.text(
-            "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT"
-        ))
+        for statement in statements:
+            db.session.execute(db.text(statement))
+
+        # Bù canonical_key cho sản phẩm cũ để hệ thống nhiều offer hoạt động.
+        products_without_key = Product.query.filter(
+            (Product.canonical_key.is_(None)) | (Product.canonical_key == "")
+        ).all()
+        for product in products_without_key:
+            product.canonical_key = canonical_product_key(product.name)
+
         db.session.commit()
     except Exception:
         db.session.rollback()
-        app.logger.exception("Không thể bảo đảm cột category cho bảng products")
+        app.logger.exception("Không thể chạy migration database khi khởi động")
+        raise
+
+
+with app.app_context():
+    db.create_all()
+    run_lightweight_database_migrations()
 
 
 # =========================================================
